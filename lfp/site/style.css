@@ -1,0 +1,71 @@
+:root {
+  --bg: #05080c;
+  --panel: #0a1016;
+  --line: #14303a;
+  --ink: #d8f6fb;
+  --ink2: #8fb3bb;
+  --mute: #5b7880;
+  --cyan: #22e3ff;
+  --orange: #ff8a2a;
+  --warn: #fab219;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.55 "JetBrains Mono", "Consolas", "Menlo", monospace; }
+header { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px;
+  padding: 22px 32px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.brand .mark { font-size: 26px; letter-spacing: 0.32em; color: var(--cyan); }
+.brand .sub { margin-left: 14px; color: var(--orange); letter-spacing: 0.12em; }
+.right { text-align: right; }
+.meta { color: var(--ink2); font-size: 12px; text-align: right; }
+nav.pages { margin-bottom: 6px; }
+nav.pages a { color: var(--ink2); text-decoration: none; margin-left: 18px; font-size: 13px; letter-spacing: 0.08em;
+  padding-bottom: 2px; border-bottom: 1px solid transparent; }
+nav.pages a.on, nav.pages a:hover { color: var(--cyan); border-bottom-color: var(--cyan); }
+h3 { margin: 16px 0 2px; font-size: 13px; font-weight: 500; color: var(--ink); letter-spacing: 0.04em; }
+a { color: var(--cyan); }
+.controls { display: flex; gap: 22px; align-items: center; padding: 12px 32px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--line); }
+.controls.inline { border: 0; padding: 4px 0 8px; }
+label { color: var(--ink2); font-size: 12px; }
+label.inline { display: inline-block; margin: 10px 0 0; }
+select { background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+  padding: 4px 8px; font: inherit; font-size: 12px; margin-left: 6px; }
+.warnings { color: var(--warn); font-size: 12px; }
+main { padding: 8px 32px 40px; max-width: 1400px; }
+section { border: 1px solid var(--line); background: var(--panel); padding: 16px 20px 18px; margin: 18px 0; }
+h2 { margin: 0 0 4px; font-size: 15px; font-weight: 500; color: var(--cyan); letter-spacing: 0.06em; }
+.tag { font-size: 11px; color: var(--orange); border: 1px solid var(--orange); padding: 1px 6px; margin-left: 8px;
+  letter-spacing: 0.08em; vertical-align: middle; }
+p.q { margin: 0 0 10px; color: var(--ink2); font-size: 12px; max-width: 980px; }
+.plot { width: 100%; height: 340px; }
+.plot.short { height: 220px; }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.grid .cell { height: 260px; }
+.tablewrap { overflow-x: auto; max-height: 520px; overflow-y: auto; }
+table { border-collapse: collapse; font-size: 12px; width: 100%; }
+th, td { padding: 4px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+th { color: var(--ink2); font-weight: 500; position: sticky; top: 0; background: var(--panel); cursor: pointer; }
+td:first-child, th:first-child { text-align: left; }
+td.flag { color: var(--warn); }
+footer { padding: 16px 32px 30px; color: var(--mute); font-size: 11px; border-top: 1px solid var(--line); }
+@media (max-width: 900px) { .pair { grid-template-columns: minmax(0, 1fr); } header, main, .controls { padding-left: 14px; padding-right: 14px; } }
+main.prose { max-width: 1060px; }
+.prose p, .prose li { color: var(--ink); font-size: 13px; line-height: 1.7; }
+.prose b { color: var(--cyan); font-weight: 500; }
+.prose ul, .prose ol { padding-left: 22px; }
+.prose code { color: var(--orange); }
+.eqs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; }
+.eqs p { margin: 0; }
+.katex { color: var(--ink); font-size: 1.05em; }
+figure { margin: 8px 0 14px; }
+figure img { width: 100%; border: 1px solid var(--line); display: block; }
+figcaption { color: var(--ink2); font-size: 12px; margin-top: 6px; }
+table.info { margin: 8px 0 12px; }
+table.info th, table.info td { text-align: left; white-space: normal; vertical-align: top; padding: 6px 10px; font-size: 12px; line-height: 1.55; }
+table.info td:first-child { color: var(--cyan); min-width: 150px; }
+blockquote { margin: 10px 0; padding: 8px 14px; border-left: 2px solid var(--orange); color: var(--ink); font-size: 13px; background: #0d1318; }
+.verdict { border: 1px solid var(--line); padding: 10px 14px; background: #0c151b; }
+svg.loop { width: 100%; height: auto; margin: 6px 0 10px; }
+.refs li { font-size: 12px; color: var(--ink2); }

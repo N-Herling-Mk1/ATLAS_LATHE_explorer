@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LATHE · pinch points: validity and next steps</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="mark">LATHE</span>
+    <span class="sub">landscape fingerprints</span>
+  </div>
+  <div class="right">
+    <nav class="pages"><a href="index.html">Fingerprints</a><a href="info.html" class="on">Info</a></nav>
+    <div class="meta">pinch-point analysis · validity · next phase</div>
+  </div>
+</header>
+
+<main class="prose">
+
+<section>
+<h2>1 · What a pinch point is</h2>
+<p>A <b>pinch point</b> is a layer where both loss terms want something from the weights and the layer cannot give both. In BCE + \(\alpha\,\)DisCo training, that means a layer whose weights the classifier term pulls one way while the decorrelation term pulls the other, with comparable force, so the layer barely moves. If that is a capacity limit, it is where the network's shape is blocking the trade-off between separation (AUC) and ABCD closure.</p>
+<p>The diagnostic is cheap: for each layer \(\ell\) take the gradients of the two terms on a fixed held-out probe batch and compare them. It needs no retraining and runs on saved checkpoints or during training.</p>
+</section>
+
+<section>
+<h2>2 · The three scores</h2>
+<p>With \(g_B = \nabla_{\theta_\ell}\mathrm{BCE}\) and \(g_D = \nabla_{\theta_\ell}\mathrm{DisCo}\) restricted to layer \(\ell\):</p>
+<div class="eqs">
+<p><b>Direction</b> $$c_\ell = \frac{g_B \cdot g_D}{\lVert g_B\rVert\,\lVert g_D\rVert} \in [-1, 1]$$</p>
+<p><b>Balance</b> $$\rho_\ell = \frac{\alpha\,\lVert g_D\rVert}{\lVert g_B\rVert}$$</p>
+<p><b>Cancellation</b> $$\kappa_\ell = \frac{\lVert g_B + \alpha\, g_D\rVert}{\lVert g_B\rVert + \alpha\lVert g_D\rVert} \in [0, 1]$$</p>
+</div>
+<ul>
+<li>\(c_\ell\) says whether the two terms agree on the direction. It ignores how hard each one pulls.</li>
+<li>\(\rho_\ell\) says whether the pulls are comparable. Near 1, direction matters; far from 1, one term simply wins.</li>
+<li>\(\kappa_\ell\) combines both: it is the fraction of the total pull that survives the sum. \(\kappa_\ell \approx 0\) is a tug of war with no net motion; \(\kappa_\ell = 1\) means the terms add.</li>
+</ul>
+<p>The three are linked: \(\kappa_\ell^2 = \dfrac{1 + \rho_\ell^2 + 2\rho_\ell c_\ell}{(1+\rho_\ell)^2}\). So \(\kappa_\ell \to 0\) requires both \(c_\ell \to -1\) <i>and</i> \(\rho_\ell \to 1\). A strongly negative cosine alone is not a stall.</p>
+<p><b>Provisional pinch-point criterion</b>: a layer with \(\kappa_\ell &lt; 0.3\) and \(1/3 &lt; \rho_\ell &lt; 3\) <i>during training</i> (epochs 5–20), in most seeds, more than the other layers. The thresholds are placeholders chosen by eye on the stand-in data; they must be fixed in the pre-registration before any ATLAS run, or replaced by a rank rule ("the most-stalled layer").</p>
+</section>
+
+<section>
+<h2>3 · Reading the panel</h2>
+<figure>
+<img src="img/h2_conflict_example.png" alt="Heatmaps of per-layer gradient cosine between BCE and DisCo for cells alpha 0, 4 and 16, epochs 1 to final">
+<figcaption>The cosine panel from the smoke test: scikit-learn's breast-cancer table standing in for the ATLAS data, 4 seeds per cell, 32-32 MLP. It shows how to read the panel; it is not a physics result. The caption inside the screenshot ("a layer that stays orange is a pinch-point candidate") is the first version and overstates what the cosine shows; section 4 explains why, and the live panel now carries \(\rho\) and \(\kappa\) beside it.</figcaption>
+</figure>
+<ul>
+<li><b>Cell a0 (\(\alpha = 0\))</b> is the most orange: down to −0.87 at the output layer (<code>net.4</code>) from epoch 10 on. But DisCo has zero weight there, so nothing is fighting. The orange is the opposition DisCo <i>would</i> exert if switched on: BCE trained freely toward a correlated solution, and on held-out events its remaining gradient points almost exactly against decorrelation. For these runs \(\rho_\ell = 0\) and \(\kappa_\ell = 1\), which is why the cosine cannot be read alone.</li>
+<li><b>Cells a4 and a16</b> settle near orthogonal (\(|c_\ell| \lesssim 0.2\)) with scattered orange, including a4's −0.53 at <code>net.4</code> at epoch 20. With DisCo active, training found weights where the two terms can coexist locally. Whether any of those cells is a stall depends on \(\rho\) and \(\kappa\). In this stand-in none is: \(\kappa\) stays at or above 0.53 and \(\rho\) runs from about 0.5 to 20 (DisCo usually dominates), so no layer meets the stall criterion. a4's −0.53 at <code>net.4</code>, epoch 20, comes with \(\rho \approx 1.1\) and \(\kappa = 0.53\): the closest thing to a fight in the data, and still well short of a stall.</li>
+</ul>
+</section>
+
+<section>
+<h2>4 · How valid is this analysis?</h2>
+<h3>What it has going for it</h3>
+<ul>
+<li><b>Permutation-safe.</b> Reordering hidden units permutes \(g_B\) and \(g_D\) together, so \(c_\ell\), \(\rho_\ell\) and \(\kappa_\ell\) do not change. Weight-space comparisons between seeds (barriers) do not have this property.</li>
+<li><b>Same events for every run.</b> All scores use one fixed probe batch, checked by hash; the site warns if runs disagree.</li>
+<li><b>Exact objective.</b> The terms come from your own <code>loss_terms</code>, weighted as in training.</li>
+<li><b>Cheap and repeatable.</b> One backward pass per term per snapshot. In-training and post-hoc values agree exactly on the same weights.</li>
+</ul>
+<h3>Threats, and what handles each</h3>
+<table class="info">
+<thead><tr><th>Threat</th><th>Why it matters</th><th>Handled by</th></tr></thead>
+<tbody>
+<tr><td>Equilibrium identity</td><td>At a stationary point of the total, \(g_B = -\alpha g_D\), so \(c = -1\), \(\rho = 1\), \(\kappa = 0\) by construction. A converged model on the trade-off looks maximally "stalled".</td><td>Only stalls <i>during</i> training count. The final column is excluded from the criterion.</td></tr>
+<tr><td>Magnitude blindness</td><td>A cosine of \(-0.9\) is irrelevant if one pull is \(100\times\) the other.</td><td>\(\rho\) and \(\kappa\).</td></tr>
+<tr><td>Probe batch ≠ training batch</td><td>The optimizer feels training-minibatch gradients; the probe batch is held-out events. A layer can stall on one and not the other.</td><td>Treat probe scores as a proxy. Cross-check by re-probing with a probe batch drawn from training events: if the stall pattern flips, report both.</td></tr>
+<tr><td>Minibatch DisCo</td><td>Training's DisCo is a minibatch statistic with small-sample bias; the probe computes it over the probe batch's background.</td><td>The dCor-gap panel quantifies the bias. A large gap weakens any pinch claim about DisCo's pull.</td></tr>
+<tr><td>Optimizer preconditioning</td><td>Adam rescales each coordinate. \(\kappa\) measures cancellation of the raw summed gradient (what Adam receives), not the step Adam takes; Adam's normalization can still move a cancelled layer by amplifying the residual.</td><td>Read \(\kappa\) as "how much consistent signal reaches the layer", not "how far it moves". Optionally log per-layer update norms in training as a check.</td></tr>
+<tr><td>Layer granularity</td><td>A layer-level score averages over units. Half the units can fight while the other half agree.</td><td>Layer-level first. Unit-level scores only if a layer is flagged.</td></tr>
+<tr><td>Seed noise</td><td>One seed's stall can be noise.</td><td>Medians across seeds; the criterion needs most seeds. Seed SDs from the Tier A run set the margins.</td></tr>
+<tr><td>Thresholds</td><td>\(\kappa &lt; 0.3\) and \(\rho \in (1/3, 3)\) are arbitrary.</td><td>Pre-register them, or use a rank rule.</td></tr>
+<tr><td>\(\alpha = 0\) runs</td><td>Show DisCo's counterfactual pull only.</td><td>\(\kappa = 1\), \(\rho = 0\) mark them; use them as the "unconstrained" reference.</td></tr>
+<tr><td>Correlation, not cause</td><td>A stalled layer co-occurring with poor closure does not mean widening it helps.</td><td>The intervention test in section 6. This is the decisive one.</td></tr>
+</tbody>
+</table>
+<p class="verdict"><b>Bottom line.</b> The scores are valid <i>descriptions</i> of where the two objectives compete on held-out events. They are <i>hypotheses</i>, not findings, about where the architecture limits the trade-off. Only changing the network and measuring turns one into the other.</p>
+</section>
+
+<section>
+<h2>5 · Are pinch points bad?</h2>
+<p>Not necessarily. Whether a pinch is bad depends on what relieving it does:</p>
+<ul>
+<li><b>Bad (a capacity limit):</b> widening or rerouting that layer pushes the AUC–closure trade-off outward, giving more closure at the same AUC or the reverse. Then the architecture itself was limiting what the loss could achieve.</li>
+<li><b>Harmless or even useful:</b> the constraint has to cost <i>somewhere</i>. Decorrelation removes information, and some layer has to absorb that. Relieving the pinch can also backfire: extra capacity can let the net satisfy DisCo on training minibatches while dependence survives in a form the minibatch dCor misses, so held-out closure gets <i>worse</i>. The dCor-gap panel is where that would show.</li>
+</ul>
+<p>So a pinch point is a <b>hypothesis about where capacity would help</b>, not a verdict.</p>
+<p>The split stays clean: LATHE diagnoses, TRUSS intervenes. Different patterns call for different fixes:</p>
+<table class="info">
+<thead><tr><th>Pattern</th><th>Likely cause</th><th>Next-phase fix</th></tr></thead>
+<tbody>
+<tr><td>Stalled at every epoch, most seeds</td><td>Capacity</td><td>Architecture (TRUSS): widen that layer, add a skip around it, split into a classifier path and a decorrelation path, or gate it (TRUSS already plans GRU-style gates)</td></tr>
+<tr><td>Stalled early, clears later</td><td>Timing: DisCo overpowers BCE before the classifier forms</td><td>Loss schedule (the \(\alpha\) ramp, \(\tau\)), no architecture change</td></tr>
+<tr><td>Stalled only in the final column</td><td>Equilibrium on the trade-off</td><td>Nothing</td></tr>
+</tbody>
+</table>
+</section>
+
+<section>
+<h2>6 · The test that decides</h2>
+<p>Pre-register a matched-cost control:</p>
+<blockquote>Widening the predicted pinch layer moves the AUC–closure front more than widening a non-pinch layer <i>with the same added parameter count</i>, and more than widening a randomly chosen layer.</blockquote>
+<ul>
+<li><b>Score</b> it the way TRUSS already does: AUC1, WP and tail %|nc|, \(Z_A\), the health gate, seed stability.</li>
+<li><b>Mechanism check:</b> the targeted change should also raise \(\kappa\) at that layer during training. If the metrics improve but \(\kappa\) does not, the improvement came from something other than relieving the pinch.</li>
+<li><b>Kill criterion:</b> if pinch-targeted changes do not beat the matched controls, the diagnostic does not help choose architectures, and it is dropped from TRUSS.</li>
+</ul>
+<h3>Work already underway</h3>
+<p><code>pinch_probe.py</code> produced pre-registered pinch predictions from the Stage 1 checkpoints, and Stage 2 has 14 architecture specs. Once Stage 2 has run you can check, with no new training:</p>
+<ol>
+<li>Do \(\kappa\) and \(\rho\) point at the same layers as <code>pinch_probe</code>?</li>
+<li>Did the Stage 2 specs that relieved those layers actually move the front?</li>
+</ol>
+<p>If both are yes, the fingerprint is earning its place in TRUSS. If the scores disagree with <code>pinch_probe</code>, Stage 2's results decide which one was right.</p>
+</section>
+
+<section>
+<h2>7 · From pinch points to a richer loss landscape</h2>
+<p>"Richer" here means a landscape in which the trade-off frontier can be reached <i>without stalls</i>: the two objectives can both be served, basins at a given closure are wider and better connected, and seeds land in equivalent places. The pinch analysis is the first instrument that says <i>where</i> the current landscape falls short of that, layer by layer and epoch by epoch, instead of only that it does.</p>
+<svg class="loop" viewBox="0 0 980 150" role="img" aria-labelledby="loopTitle">
+<title id="loopTitle">Design loop: fingerprint, pinch hypothesis, intervention, re-measure, surrogate</title>
+<defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M2 1L8 5L2 9" fill="none" stroke="#22e3ff" stroke-width="1.5"/></marker></defs>
+<g font-family="JetBrains Mono, Consolas, monospace" font-size="13" text-anchor="middle">
+<rect x="10" y="40" width="160" height="60" fill="#0d1820" stroke="#22e3ff" stroke-width="1"/><text x="90" y="66" fill="#d8f6fb">Fingerprint</text><text x="90" y="86" fill="#8fb3bb" font-size="11">c, ρ, κ, λ, slices</text>
+<rect x="210" y="40" width="160" height="60" fill="#0d1820" stroke="#22e3ff" stroke-width="1"/><text x="290" y="66" fill="#d8f6fb">Pinch hypothesis</text><text x="290" y="86" fill="#8fb3bb" font-size="11">layer, epoch, cause</text>
+<rect x="410" y="40" width="160" height="60" fill="#1c140c" stroke="#ff8a2a" stroke-width="1"/><text x="490" y="66" fill="#d8f6fb">Intervention</text><text x="490" y="86" fill="#8fb3bb" font-size="11">architecture or loss</text>
+<rect x="610" y="40" width="160" height="60" fill="#0d1820" stroke="#22e3ff" stroke-width="1"/><text x="690" y="66" fill="#d8f6fb">Re-measure</text><text x="690" y="86" fill="#8fb3bb" font-size="11">fingerprint + metrics</text>
+<rect x="810" y="40" width="160" height="60" fill="#0d1820" stroke="#22e3ff" stroke-width="1"/><text x="890" y="66" fill="#d8f6fb">Surrogate</text><text x="890" y="86" fill="#8fb3bb" font-size="11">if the kill test passes</text>
+<line x1="172" y1="70" x2="206" y2="70" stroke="#22e3ff" marker-end="url(#ar)"/>
+<line x1="372" y1="70" x2="406" y2="70" stroke="#22e3ff" marker-end="url(#ar)"/>
+<line x1="572" y1="70" x2="606" y2="70" stroke="#22e3ff" marker-end="url(#ar)"/>
+<line x1="772" y1="70" x2="806" y2="70" stroke="#22e3ff" marker-end="url(#ar)"/>
+<path d="M690 102 L690 130 L90 130 L90 104" fill="none" stroke="#5b7880" stroke-dasharray="4 4" marker-end="url(#ar)"/>
+<text x="390" y="146" fill="#5b7880" font-size="11">loop: the new fingerprint is the next round's starting point</text>
+</g>
+</svg>
+<h3>Levers that reshape the landscape at a pinch</h3>
+<table class="info">
+<thead><tr><th>Lever</th><th>What it does to the landscape</th><th>Fits which pinch</th></tr></thead>
+<tbody>
+<tr><td>Widen the layer</td><td>Adds directions, so both terms can be served by different weights instead of competing for the same ones</td><td>Persistent (capacity)</td></tr>
+<tr><td>Skip connection around it</td><td>Gives gradients a path that bypasses the stalled layer; skips are known to smooth loss surfaces (Li et al. 2018)</td><td>Persistent, deep nets</td></tr>
+<tr><td>Split paths (classifier / decorrelation)</td><td>Separates the parameters each term acts on; the Hessian becomes closer to block-diagonal between the paths</td><td>Persistent, \(\rho \approx 1\)</td></tr>
+<tr><td>Gating (GRU-style)</td><td>Lets the network learn when each path contributes</td><td>Persistent, epoch-dependent</td></tr>
+<tr><td>\(\alpha\) ramp, \(\alpha(t) = \alpha_{\max}\min(1, t/\tau)\)</td><td>Changes the landscape over time: DisCo's pull arrives after the classifier forms</td><td>Early (timing)</td></tr>
+<tr><td>Larger DisCo batch \(n_{\text{disco}}\)</td><td>Smooths and de-biases DisCo's pull</td><td>Pinches with a large dCor gap</td></tr>
+<tr><td>Layer-local gradient surgery (PCGrad, Yu et al. 2020)</td><td>At the flagged layer only, removes the component of one gradient that opposes the other</td><td>Persistent; a loss-side alternative to adding capacity</td></tr>
+</tbody>
+</table>
+<h3>Why this gives a richer landscape, not just a better model</h3>
+<ul>
+<li><b>Each intervention makes a two-part prediction:</b> a mechanism (\(\kappa\) at the flagged layer rises during training; \(\lambda_{\min}\) becomes less negative; seed-pair barriers and seed SD shrink) and an outcome (the front moves). Measuring both separates "the landscape changed the way we intended" from "the metric moved for another reason".</li>
+<li><b>Interventions become data.</b> Every (architecture, loss setting) → fingerprint → metrics triple is a row for the LATHE surrogate. If the kill test passes (fingerprints predict held-out closure better than hyperparameters alone), the fingerprint becomes the design space: specify the landscape you want (no stalls, flat connected basins) and search for architectures and loss schedules that produce it.</li>
+<li><b>It closes the loop with TRUSS.</b> TRUSS's search stops being blind: candidate specs are proposed where the landscape says capacity is missing, and the matched-cost controls keep that honest.</li>
+</ul>
+</section>
+
+<section>
+<h2>References</h2>
+<ul class="refs">
+<li>H. Li, Z. Xu, G. Taylor, C. Studer, T. Goldstein, <i>Visualizing the Loss Landscape of Neural Nets</i>, NeurIPS 2018. <a href="https://arxiv.org/abs/1712.09913">arXiv:1712.09913</a></li>
+<li>T. Yu et al., <i>Gradient Surgery for Multi-Task Learning</i> (PCGrad), NeurIPS 2020. <a href="https://arxiv.org/abs/2001.06782">arXiv:2001.06782</a></li>
+<li>G. Kasieczka, D. Shih, <i>Robust Jet Classifiers through Distance Correlation</i> (DisCo), PRL 2020. <a href="https://arxiv.org/abs/2001.05310">arXiv:2001.05310</a></li>
+<li>G. Kasieczka, B. Nachman, M. Schwartz, D. Shih, <i>ABCDisCo</i>, PRD 2021. <a href="https://arxiv.org/abs/2007.14400">arXiv:2007.14400</a></li>
+<li>T. Garipov et al., <i>Loss Surfaces, Mode Connectivity, and Fast Ensembling of DNNs</i>, NeurIPS 2018. <a href="https://arxiv.org/abs/1802.10026">arXiv:1802.10026</a></li>
+<li>S. Ainsworth, J. Hayase, S. Srinivasa, <i>Git Re-Basin</i>, ICLR 2023. <a href="https://arxiv.org/abs/2209.04836">arXiv:2209.04836</a></li>
+</ul>
+</section>
+
+</main>
+<footer>LATHE · lfp 0.3 · this page is static text; it is not regenerated from run data.</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<script>
+  window.addEventListener("load", function () {
+    if (window.renderMathInElement) renderMathInElement(document.body, {
+      delimiters: [{ left: "$$", right: "$$", display: true }, { left: "\\(", right: "\\)", display: false }],
+      throwOnError: false });
+  });
+</script>
+</body>
+</html>
