@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>L.A.T.H.E · loss-landscape explorer</title>
+<meta name="description" content="LATHE measures the loss-landscape geometry of the ATLAS Run-3 LLP classifiers (BCE + α·DisCo) and tests whether it predicts held-out ABCD closure better than the loss settings alone.">
+<meta name="theme-color" content="#04070b">
+<meta property="og:title" content="L.A.T.H.E · loss-landscape explorer">
+<meta property="og:description" content="Loss-landscape fingerprints for the ATLAS Run-3 LLP classifiers: what we expect to see, and the explorer that will show what we measure.">
+<meta property="og:image" content="assets/icons/icon-512.png">
+<meta property="og:type" content="website">
+<link rel="icon" href="assets/icons/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/icon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800;900&family=Share+Tech+Mono&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<link rel="stylesheet" href="assets/css/lathe.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="#overview" aria-label="LATHE home">
+      <img src="assets/icons/lathe-mark-120h.png" alt="">
+      <span>
+        <span class="dotted"><span class="lc">L</span><span class="d">.</span><span class="lc">A</span><span class="d">.</span><span class="lc">T</span><span class="d">.</span><span class="lo">H</span><span class="d">.</span><span class="lo">E</span></span>
+        <span class="sub">loss-landscape explorer</span>
+      </span>
+    </a>
+    <button class="navtoggle" aria-label="menu">MENU</button>
+    <nav class="nav">
+      <a href="#fingerprint">Fingerprint</a>
+      <a href="#expect">Expectations</a>
+      <a href="#explorer">Explorer</a>
+      <a href="#pipeline">Pipeline</a>
+      <a href="#status">Status</a>
+      <a class="ext" href="https://n-herling-mk1.github.io/ATLAS_Master_Project_Repo/#lathe">Deck ↗</a>
+      <a class="ext" href="https://github.com/N-Herling-Mk1/ATLAS_LATHE_explorer">Repo ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<!-- ================================================================= HERO -->
+<section id="overview" class="hero">
+  <div class="art frame">
+    <img src="assets/img/lathe-logo.webp" alt="LATHE: Latent Activation Topology of Hidden Embeddings" width="1600" height="1000">
+  </div>
+  <div>
+    <p class="kicker"><span class="n">03</span>ATLAS · Run-3 LLP · MSVtx</p>
+    <h1>Mapping the <span class="c">loss</span> <span class="o">landscape</span></h1>
+    <div class="expansion"><b class="c">L</b>atent <b class="c">A</b>ctivation <b class="c">T</b>opology of <b class="o">H</b>idden <b class="o">E</b>mbeddings</div>
+    <p>LATHE measures the geometry a trained classifier sits in: how sharp its basin is, where the <strong>BCE</strong> and <strong>α·DisCo</strong> terms pull against each other, and whether two seeds landed in the same valley. It then asks one question: <strong>does that geometry predict held-out ABCD closure better than the loss settings alone?</strong></p>
+    <p>LATHE describes and maps. Any optimization that uses the map belongs to TRUSS, and only if the kill test passes. Otherwise LATHE would be grading its own exam.</p>
+    <div class="chips">
+      <span class="chip c"><span class="dot"></span>lfp v0.3 · mk3</span>
+      <span class="chip"><span class="dot"></span>smoke-tested end to end</span>
+      <span class="chip o"><span class="dot blink"></span>ATLAS runs pending</span>
+    </div>
+    <div class="cta">
+      <a class="btn" href="#expect">What we expect to see</a>
+      <a class="btn o" href="#explorer">Explorer</a>
+      <a class="btn ghost" href="https://n-herling-mk1.github.io/ATLAS_Master_Project_Repo/#lathe">Research deck ↗</a>
+    </div>
+  </div>
+</section>
+
+<div class="motif frame">
+  <img src="assets/icons/lathe-mark-120h.png" alt="">
+  <p>Two objectives on one network. <span class="c">Cyan</span> is the classifier term (BCE), <span class="o">orange</span> the decorrelation term (α·DisCo), and the dark lens is where they overlap and have to trade off. LATHE maps that overlap. The same colours run through every sketch below: cyan for baseline or healthy, orange for stress (high α, opposed gradients, the degraded seed).</p>
+</div>
+
+<!-- ================================================================= FINGERPRINT -->
+<section id="fingerprint" class="blk">
+  <p class="kicker"><span class="n">01</span>Definition</p>
+  <h2>What a <span class="hl">fingerprint</span> is</h2>
+  <div class="rule"></div>
+  <p class="lead">A fixed set of geometric measurements, taken at fixed points in training (epochs 1, 5, 10, 20, final) or on a saved checkpoint, always on the same held-out probe batch. Each run becomes one row: settings in, fingerprint in the middle, final metrics out.</p>
+
+  <div class="cards">
+    <div class="card frame">
+      <span class="tag">H2</span><h3>Gradient conflict, per layer</h3>
+      <div class="eq">\(c_\ell = \cos(g_B, g_D)\) &nbsp; \(\rho_\ell = \alpha\lVert g_D\rVert / \lVert g_B\rVert\)<br>\(\kappa_\ell = \dfrac{\lVert g_B + \alpha g_D\rVert}{\lVert g_B\rVert + \alpha\lVert g_D\rVert}\)</div>
+      <p>Direction, balance and cancellation of the two terms in each layer. A layer that stalls (κ small, ρ near 1) through training is a pinch-point candidate.</p>
+    </div>
+    <div class="card frame">
+      <span class="tag">H1 · H3</span><h3>Hessian spectrum ends</h3>
+      <div class="eq">\(\lambda_{\max},\; \lambda_{\min},\; \operatorname{tr} H\)</div>
+      <p>Sharpness and negative curvature by (shifted) power iteration; the trace by Hutchinson. Tracked over epochs, it shows whether there is an early curvature spike.</p>
+    </div>
+    <div class="card frame">
+      <span class="tag">H1</span><h3>1-D filter-normalized slices</h3>
+      <div class="eq">\(\Delta L(a) = L(\theta^* + a\,d) - L(\theta^*)\)</div>
+      <p>Rise, width and roughness of the basin along random filter-normalized directions (Li et al. 2018), so basins can be compared across α.</p>
+    </div>
+    <div class="card frame">
+      <span class="tag">H4</span><h3>Seed-pair interpolation</h3>
+      <div class="eq">\(B_{AB} = \max_t\,\big[L(t) - \text{chord}(t)\big]\)</div>
+      <p>The loss bump on the straight line between two seeds' weights, plus a permutation-free prediction distance. Is a degraded seed in a separate basin?</p>
+    </div>
+    <div class="card frame">
+      <span class="tag">DisCo</span><h3>dCor gap</h3>
+      <div class="eq">\(\mathbb{E}_{\text{mb}}\big[\mathrm{dCor}^2\big] - \mathrm{dCor}^2_{\text{full}}\)</div>
+      <p>DisCo is a batch statistic. If minibatches see more dependence than the full background sample, training optimizes a biased version of the target.</p>
+    </div>
+    <div class="card frame">
+      <span class="tag">KILL</span><h3>From fingerprint to verdict</h3>
+      <div class="eq">\((\phi, A, \text{fold}, \text{seed}) \to F_{t_1},\dots,F_{\text{final}} \to M_{\text{final}}\)</div>
+      <p>The thesis is testable: a fingerprint is a better intermediate representation than the raw settings φ if it predicts the final metrics better, and that should carry over across architectures.</p>
+    </div>
+  </div>
+  <div class="note"><b>Leakage guard.</b> Final per-term losses are recorded but tagged <code>loss_*</code> and kept out of the kill-test features: "the final DisCo value predicts closure" is already known and is not a landscape finding. Map events and closure events are disjoint. Validity of the pinch-point scores: <a href="lfp/site/info.html">pinch-point notes →</a></div>
+</section>
+
+<!-- ================================================================= EXPECTATIONS -->
+<section id="expect" class="blk">
+  <p class="kicker"><span class="n">02</span>Pre-registration, drawn</p>
+  <h2>What we <span class="hl">expect</span> to see</h2>
+  <div class="rule"></div>
+  <p class="lead">These are the "guesstimate" panels: the shapes we sketched for each hypothesis on 7 Nov 2026, before a single ATLAS fingerprint was measured. Each one also shows the null, which is what the plot would look like if the hypothesis is wrong. Writing both down first is the point: the measured panels in the explorer can only confirm or refute what is on this page.</p>
+
+  <div class="banner">
+    <span class="stamp">▣ SCHEMATIC · NOT DATA</span>
+    <span class="txt">Closed-form shapes, no axis values. Toggle any panel, or flip them all at once.</span>
+    <div class="seg" id="allToggle"><button data-v="exp" class="on">All · hypothesis</button><button data-v="null">All · null</button></div>
+  </div>
+
+  <div class="sketches">
+    <article class="sk frame" data-sketch="h1">
+      <div class="sk-head"><span class="sk-id">H1</span><h3>Basin shape vs <span class="nt">α</span></h3></div>
+      <p class="q">Does a heavier DisCo weight put the network in a narrower, rougher basin, which would explain the α = 32 instability mechanically?</p>
+      <svg role="img" aria-label="Schematic: 1-D loss slices for alpha 8, 16 and 32"></svg>
+      <div class="ctl"><span class="probe">probe · filter-normalized 1-D slices</span><div class="seg"><button data-v="exp" class="on">Hypothesis</button><button data-v="null">Null</button></div></div>
+      <div class="reading"></div>
+      <div class="foot"><span class="tr">Tier <b>A</b> · Stage 1 checkpoints, no training</span><span>needs α = 32 checkpoints</span></div>
+    </article>
+
+    <article class="sk frame" data-sketch="h2">
+      <div class="sk-head"><span class="sk-id o">H2</span><h3>Where the two losses fight</h3></div>
+      <p class="q">Does the BCE/DisCo opposition concentrate in one layer during training? That layer would be a pinch point, where architecture limits the trade-off.</p>
+      <svg role="img" aria-label="Schematic: per-layer gradient cosine heatmap over epochs"></svg>
+      <div class="ctl"><span class="probe">probe · c<sub>ℓ</sub> per layer × epoch (read with ρ, κ)</span><div class="seg"><button data-v="exp" class="on">Hypothesis</button><button data-v="null">Null</button></div></div>
+      <div class="reading"></div>
+      <div class="foot"><span class="tr">final column Tier <b>A</b> · trajectory Tier <b>B</b></span><span>stall thresholds: open decision 1</span></div>
+    </article>
+
+    <article class="sk frame" data-sketch="h3">
+      <div class="sk-head"><span class="sk-id">H3</span><h3>Curvature over training</h3></div>
+      <p class="q">Is the α = 32 problem one of timing? If an α ramp removes an early sharpness spike, it is when α arrives that matters, not how large it is.</p>
+      <svg role="img" aria-label="Schematic: top Hessian eigenvalue versus epoch, constant versus ramped alpha"></svg>
+      <div class="ctl"><span class="probe">probe · λ<sub>max</sub>, λ<sub>min</sub> at epochs 1, 5, 10, 20, final</span><div class="seg"><button data-v="exp" class="on">Hypothesis</button><button data-v="null">Null</button></div></div>
+      <div class="reading"></div>
+      <div class="foot"><span class="tr">constant-α Tier <b>B</b> · ramp Tier <b>C</b></span><span>needs new runs</span></div>
+    </article>
+
+    <article class="sk frame" data-sketch="h4">
+      <div class="sk-head"><span class="sk-id o">H4</span><h3>Is the degraded seed in its own basin?</h3></div>
+      <p class="q">α = 32 seed 8005 underperforms its cell. Is it in a separate basin, or at a badly converged point of the same one?</p>
+      <svg role="img" aria-label="Schematic: loss above the chord along the line between two seeds"></svg>
+      <div class="ctl"><span class="probe">probe · interpolation barrier + prediction distance</span><div class="seg"><button data-v="exp" class="on">Hypothesis</button><button data-v="null">Null</button></div></div>
+      <div class="reading"></div>
+      <div class="foot"><span class="tr">Tier <b>A</b> · positive control</span><span>compare pair groups, never against zero</span></div>
+    </article>
+
+    <article class="sk frame" data-sketch="dcor">
+      <div class="sk-head"><span class="sk-id">dCor</span><h3>Is DisCo chasing a biased target?</h3></div>
+      <p class="q">If minibatch dCor² sits above the full-sample value, more so for small DisCo batches, then the batch size n<sub>disco</sub> is a real hyperparameter.</p>
+      <svg role="img" aria-label="Schematic: minibatch versus full-sample distance correlation"></svg>
+      <div class="ctl"><span class="probe">probe · minibatch vs full-sample dCor² on background</span><div class="seg"><button data-v="exp" class="on">Hypothesis</button><button data-v="null">Null</button></div></div>
+      <div class="reading"></div>
+      <div class="foot"><span class="tr">Tier <b>A</b> · n<sub>disco</sub> sweep in Tier <b>C</b></span><span>dCor vs dCor²: open decision 5</span></div>
+    </article>
+
+    <article class="sk frame" data-sketch="kill">
+      <div class="sk-head"><span class="sk-id o">KILL</span><h3>The four-way kill test</h3></div>
+      <p class="q">Do landscape coordinates predict held-out closure better than the hyperparameters, the prediction-space map and the representation map?</p>
+      <svg role="img" aria-label="Schematic: held-out closure error for four predictor families"></svg>
+      <div class="ctl"><span class="probe">ridge · grouped CV by seed · permutation null</span><div class="seg"><button data-v="exp" class="on">Hypothesis</button><button data-v="null">Null</button></div></div>
+      <div class="reading"></div>
+      <div class="foot"><span class="tr">Tier <b>C</b> · 102-run pilot</span><span>runs once, pre-registered, held-out</span></div>
+    </article>
+  </div>
+</section>
+
+<!-- ================================================================= EXPLORER -->
+<section id="explorer" class="blk">
+  <p class="kicker"><span class="n">03</span>Measured</p>
+  <h2>The <span class="hl">explorer</span></h2>
+  <div class="rule"></div>
+  <p class="lead">The explorer is generated, not hand-written. Fingerprints come from runs executed locally (the ML sig/bg training), <code>lfp build-site</code> aggregates them with the run ledger, and the result is published under <code>explorer/</code>. It has one measured panel for every sketch above.</p>
+
+  <div class="explorer">
+    <div class="status frame" id="explorerStatus">
+      <p class="kicker">bundle status</p>
+      <div class="big wait">AWAITING FIRST ATLAS RUN</div>
+      <p class="msg" style="color:var(--ink2);margin:0">No fingerprint bundle is published yet, so the sketches are the only curves on this site.</p>
+      <dl><dt>looks for</dt><dd>explorer/data/bundle.json</dd><dt>state</dt><dd>not found</dd></dl>
+      <div class="cta">
+        <a class="btn off" id="openExplorer" href="explorer/index.html" aria-disabled="true">Open explorer</a>
+        <a class="btn ghost" href="lfp/site/info.html">Pinch-point notes</a>
+      </div>
+      <pre class="cmd"><span class="p"># publish (from the repo root, after probing)</span>
+<span class="k">python</span> -m lfp build-site <span class="a">--fp</span> fp\stage1 fp\base ^
+  <span class="a">--ledger</span> runs\stage1\grade\ledger.csv <span class="a">--key</span> name ^
+  <span class="a">--out</span> explorer <span class="a">--clean</span>
+<span class="p"># then commit explorer/ and push</span></pre>
+    </div>
+
+    <div class="tiers">
+      <div class="tier frame"><div class="t">A</div><div><h4>No training · Stage 1 checkpoints</h4><p>α = 8, 16 (and 32 if saved) × 10 seeds, fold 0. Final-state H1, H2, H4, dCor gap, and the seed SD of every feature. Positive control: α = 32 seed 8005.</p></div><div class="runs">20–30<small>runs</small></div></div>
+      <div class="tier frame"><div class="t">B</div><div><h4>Base run · new training with the recorder</h4><p>α ∈ {8, 16, 32} × 10 seeds, recorder at epochs 1, 5, 10, 20, final. Reproduction check against the Stage 1 ledger first. Detects r ≈ 0.5.</p></div><div class="runs">30<small>runs</small></div></div>
+      <div class="tier frame"><div class="t">C</div><div><h4>LATHE pilot · the kill test</h4><p>16 Sobol points over (log α<sub>max</sub>, τ, log n<sub>disco</sub>) × 2 architectures × 3 seeds, plus anchors. Runs only after B shows usable seed SDs.</p></div><div class="runs">102<small>runs</small></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================= PIPELINE -->
+<section id="pipeline" class="blk">
+  <p class="kicker"><span class="n">04</span>How it runs</p>
+  <h2>From checkpoint to <span class="hl">site</span></h2>
+  <div class="rule"></div>
+  <div class="rail">
+    <div class="step"><h4>Adapter</h4><p>Copy and fill the template: model factory, checkpoint path, probe batch, loss terms.</p><code>adapters/TEMPLATE.py</code></div>
+    <div class="step"><h4>Probe</h4><p>Fingerprint saved checkpoints, then seed pairs within each cell. No training.</p><code>lfp probe · lfp pairs</code></div>
+    <div class="step"><h4>Record</h4><p>Hook new training runs at chosen epochs. Verified bit-for-bit identical to training without it.</p><code>FingerprintRecorder</code></div>
+    <div class="step"><h4>Build</h4><p>Aggregate fingerprints and the ledger into the static explorer. Opens from disk.</p><code>lfp build-site --out explorer</code></div>
+    <div class="step"><h4>Preview</h4><p>Exploratory kill test on design data: ridge, CV grouped by seed, permutation null.</p><code>lfp killtest</code></div>
+  </div>
+
+  <div class="two">
+    <div class="bites frame">
+      <h3>Things that will bite</h3>
+      <ul>
+        <li><b>Permutation symmetry.</b> Barriers between unaligned seeds are above zero even for equivalent solutions. Compare groups of pairs.</li>
+        <li><b>Negative curvature is expected</b> on a held-out probe batch. Its size by cell is the signal.</li>
+        <li><b>DisCo must be twice differentiable.</b> <code>cdist</code>/<code>sqrt</code> at zero distance gives NaN Hessian-vector products; lfp flags it.</li>
+        <li><b>dCor convention.</b> Probes return dCor². If training penalizes dCor, call <code>set_dcor_squared(False)</code>.</li>
+        <li><b>α = 0 runs</b> still report conflict: the pull DisCo would exert, at zero weight.</li>
+        <li><b>Cost.</b> Hessian probes dominate. Time one run (<code>timing_s</code>) before launching many.</li>
+      </ul>
+    </div>
+    <div class="tree frame">
+      <h3>Repository</h3>
+<pre><span class="d">lfp/</span>                 <span class="m">library, no dependency on training code</span>
+  <span class="f">adapter.py</span>         <span class="m">RunHandle contract</span>
+  <span class="d">probes/</span>            <span class="m">conflict · curvature · slices · pairs · dcor</span>
+  <span class="f">recorder.py</span>        <span class="m">training-time hook</span>
+  <span class="f">summary.py</span>         <span class="m">fingerprints → one row per run</span>
+  <span class="f">site_build.py</span>      <span class="m">writes the explorer + data bundle</span>
+  <span class="f">killtest.py</span>        <span class="m">exploratory preview</span>
+  <span class="d">site/</span>              <span class="m">explorer template (Plotly, no build step)</span>
+<span class="d">adapters/</span>            <span class="m">TEMPLATE.py</span>
+<span class="d">docs/</span>                <span class="m">DESIGN_HISTORY · BASE_RUN_PLAN</span>
+<span class="d">tests/</span>               <span class="m">9 analytic probe checks</span>
+<span class="d">examples/</span>            <span class="m">sklearn smoke test</span>
+<span class="d">assets/</span> <span class="f">index.html</span>    <span class="m">this page</span>
+<span class="d">explorer/</span>            <span class="m">published build (once runs exist)</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================= STATUS -->
+<section id="status" class="blk">
+  <p class="kicker"><span class="n">05</span>Where it stands</p>
+  <h2>Status &amp; <span class="hl">open decisions</span></h2>
+  <div class="rule"></div>
+  <div class="checks">
+    <div class="check frame"><span class="s done">DONE</span><span>Probes implemented; 9 analytic correctness checks pass.</span></div>
+    <div class="check frame"><span class="s done">DONE</span><span>Recorder leaves training bit-for-bit unchanged; in-training and post-hoc fingerprints agree exactly.</span></div>
+    <div class="check frame"><span class="s done">DONE</span><span>End-to-end smoke test (train → probe → pairs → site → killtest) on a public sklearn table.</span></div>
+    <div class="check frame"><span class="s next">NEXT</span><span>Tier A on the Stage 1 checkpoints: first ATLAS fingerprints, and the seed SD of every feature.</span></div>
+  </div>
+
+  <div class="frame" style="padding:6px 8px 4px">
+    <table class="dec">
+      <thead><tr><th>#</th><th>Open decision</th><th>Why it matters</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Stall thresholds (κ &lt; 0.3, 1/3 &lt; ρ &lt; 3) or a rank rule</td><td>Fix before any ATLAS fingerprint is seen</td></tr>
+        <tr><td>2</td><td>Is there an unused held-out partition for the lockbox?</td><td>Needed before any loop optimizes φ</td></tr>
+        <tr><td>3</td><td>Were α = 32 Stage 1 checkpoints saved?</td><td>Tier A positive control (seed 8005)</td></tr>
+        <tr><td>4</td><td>Stage 2 status</td><td>Needed for the <code>pinch_probe</code> cross-check</td></tr>
+        <tr><td>5</td><td>DisCo convention in training: dCor or dCor²?</td><td><code>set_dcor_squared(False)</code> if dCor</td></tr>
+        <tr><td>6</td><td>What TRUSS's DisCo decorrelates against (NN2 score or a fixed variable)</td><td>Goes into the adapter's <code>disco_pair</code></td></tr>
+        <tr><td>7</td><td>Is the DisCo implementation twice differentiable?</td><td>Check with one <code>lfp probe</code> run</td></tr>
+        <tr><td>8</td><td>Outer objective for any loss search: Pareto front or Z<sub>A</sub></td><td>Z<sub>A</sub> rewarded the unstable α = 32 cell in Stage 1</td></tr>
+        <tr><td>9</td><td>α schedules (τ) in the first pilot, or held back</td><td>The α = 32 instability is the sharpest Stage 1 finding</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="docs">
+    <a class="doc frame" href="https://github.com/N-Herling-Mk1/ATLAS_LATHE_explorer/blob/main/docs/DESIGN_HISTORY.md"><b>Design history ↗</b><span>Why the repo exists: reasoning, decisions, corrections, open items.</span></a>
+    <a class="doc frame" href="https://github.com/N-Herling-Mk1/ATLAS_LATHE_explorer/blob/main/docs/BASE_RUN_PLAN.md"><b>Base run plan ↗</b><span>How big a run has to be before comparisons mean anything.</span></a>
+    <a class="doc frame" href="lfp/site/info.html"><b>Pinch-point notes</b><span>What c, ρ and κ can and cannot tell you, and the test that decides.</span></a>
+    <a class="doc frame" href="https://github.com/N-Herling-Mk1/ATLAS_LATHE_explorer#readme"><b>README ↗</b><span>Install, workflow, commands.</span></a>
+    <a class="doc frame" href="https://n-herling-mk1.github.io/ATLAS_Master_Project_Repo/#lathe"><b>LATHE research deck ↗</b><span>The project page on the ATLAS hub: questions, literature, timeline.</span></a>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="in">
+    <span><img src="assets/icons/lathe-mark-120h.png" alt="">L.A.T.H.E · loss-landscape explorer · part of the ATLAS Run-3 LLP project set</span>
+    <span><a href="https://n-herling-mk1.github.io/ATLAS_Master_Project_Repo/">ATLAS project hub ↗</a> · <a href="https://github.com/N-Herling-Mk1/ATLAS_LATHE_explorer">source ↗</a></span>
+  </div>
+</footer>
+
+<script src="assets/js/sketches.js"></script>
+<script src="assets/js/site.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+</body>
+</html>

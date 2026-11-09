@@ -25,7 +25,7 @@ lfp/                     the library (no dependency on your training code)
   site_build.py          writes the static site + data bundle
   killtest.py            exploratory kill-test preview
   cli.py                 python -m lfp (or `lfp`) probe | pairs | build-site | killtest
-  site/                  static front end: index.html (fingerprints), info.html (pinch-point validity)
+  site/                  explorer template: index.html (fingerprints), info.html (pinch-point validity)
 adapters/TEMPLATE.py     copy and fill for your runs
 docs/
   DESIGN_HISTORY.md      how this repo came about: reasoning, decisions, corrections, open items
@@ -33,6 +33,8 @@ docs/
   img/                   site screenshots used by the docs
 tests/                   analytic correctness tests of the probes
 examples/smoke_sklearn/  end-to-end smoke test on a real public table (delete any time)
+index.html, assets/      public home page (GitHub Pages root): definitions, hypothesis sketches, status
+explorer/                published explorer build (created by build-site --out explorer; commit it)
 ```
 
 Start with [docs/DESIGN_HISTORY.md](docs/DESIGN_HISTORY.md) for the why; this README is the how.
@@ -66,9 +68,9 @@ python examples\smoke_sklearn\run_smoke.py   # ~20 s; then open smoke_out\site\i
    Verify once that training with and without the recorder is bit-for-bit identical (the smoke test does exactly this check; it passes here).
 4. **Site:**
    ```powershell
-   python -m lfp build-site --fp fp\stage1 fp\base --ledger runs\stage1\grade\ledger.csv --key name --out site_build --clean
+   python -m lfp build-site --fp fp\stage1 fp\base --ledger runs\stage1\grade\ledger.csv --key name --out explorer --clean
    ```
-   Open `site_build\index.html` directly (data is embedded in `data\bundle.js`, so no server is needed; Plotly loads from cdnjs). `site_build\data\fp_summary.csv` is the one-row-per-run table.
+   Open `explorer\index.html` directly (data is embedded in `data\bundle.js`, so no server is needed; Plotly loads from cdnjs). `explorer\data\fp_summary.csv` is the one-row-per-run table. To publish, commit `explorer/`: the home page detects `explorer/data/bundle.json` and switches its status panel from "awaiting first ATLAS run" to the run summary, with a link in. Use `--out site_build` for private builds you don't want published (it is git-ignored).
 5. **Exploratory kill-test preview** (design data only):
    ```powershell
    python -m lfp killtest --summary site_build\data\fp_summary.csv --target led_pnc_wp --hyper meta_alpha --group meta_seed
@@ -83,6 +85,10 @@ python examples\smoke_sklearn\run_smoke.py   # ~20 s; then open smoke_out\site\i
 - **dCor convention.** `lfp.probes.dcor` returns dCor² (the usual DisCo penalty). If your training penalizes dCor, call `lfp.probes.set_dcor_squared(False)` once at start-up (in your adapter).
 - **α = 0 runs** still report BCE/DisCo conflict: it is the conflict the DisCo term *would* exert, with zero weight in the objective.
 - **Cost.** Every snapshot's `timing_s` is recorded. Time one run before launching many; the Hessian probes dominate.
+
+## Public site
+
+GitHub Pages serves the repo root. `index.html` is the home page: what a fingerprint is, the **hypothesis sketches** (the shapes expected for H1–H4, the dCor gap and the kill test, each with a toggle to its null outcome; schematic, no data), the explorer status, the pipeline and the open decisions. The sketches live in `assets/js/sketches.js` as closed-form shapes, so they never depend on a run. The measured counterparts are the panels of the built explorer under `explorer/`, and each of those links back to its sketch.
 
 ## Status
 

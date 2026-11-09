@@ -4,17 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LATHE · landscape fingerprints</title>
+<link rel="icon" type="image/png" href="img/icon-32.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Share+Tech+Mono&display=swap">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 <body>
 <header>
-  <div class="brand">
-    <span class="mark">LATHE</span>
-    <span class="sub">landscape fingerprints</span>
-  </div>
+  <a class="brand" href="https://n-herling-mk1.github.io/ATLAS_LATHE_explorer/">
+    <img src="img/lathe-mark.png" alt="">
+    <span><span class="mark"><i class="c">L</i><b>.</b><i class="c">A</i><b>.</b><i class="c">T</i><b>.</b><i class="o">H</i><b>.</b><i class="o">E</i></span>
+    <span class="sub">landscape fingerprints · explorer</span></span>
+  </a>
   <div class="right">
-    <nav class="pages"><a href="index.html" class="on">Fingerprints</a><a href="info.html">Info</a></nav>
+    <nav class="pages"><a href="https://n-herling-mk1.github.io/ATLAS_LATHE_explorer/">Home ↗</a><a href="https://n-herling-mk1.github.io/ATLAS_LATHE_explorer/#expect">Sketches ↗</a><a href="index.html" class="on">Fingerprints</a><a href="info.html">Pinch points</a></nav>
     <div id="meta" class="meta"></div>
   </div>
 </header>
@@ -27,15 +30,15 @@
 
 <main>
   <section>
-    <h2>H1 · Basin shape</h2>
+    <h2>H1 · Basin shape <a class="sketch" href="https://n-herling-mk1.github.io/ATLAS_LATHE_explorer/#expect" title="the pre-registered sketch for this panel">sketch ↗</a></h2>
     <p class="q">Filter-normalized 1-D slices through the final weights, \(L(\theta + a\,d) - L(\theta)\), averaged over directions. Line = median run, band = min–max across runs in the group. Narrower and bumpier = sharper, rougher basin.</p>
     <div id="slices" class="plot"></div>
     <div id="sliceStats" class="plot short"></div>
   </section>
 
   <section>
-    <h2>H2 · Where the two losses fight</h2>
-    <p class="q">Three per-layer scores, median across runs. Read them together: the cosine alone is not a pinch-point test (see <a href="info.html">Info</a>).</p>
+    <h2>H2 · Where the two losses fight <a class="sketch" href="https://n-herling-mk1.github.io/ATLAS_LATHE_explorer/#expect" title="the pre-registered sketch for this panel">sketch ↗</a></h2>
+    <p class="q">Three per-layer scores, median across runs. Read them together: the cosine alone is not a pinch-point test (see <a href="info.html">Pinch points</a>).</p>
     <h3>Direction · \(c_\ell = \cos(\nabla \mathrm{BCE}, \nabla \mathrm{DisCo})\)</h3>
     <p class="q">Orange = the terms pull this layer in opposite directions, cyan = the same direction. At a converged trade-off the cosine is near \(-1\) by construction, so orange in the final column alone means equilibrium, not a defect.</p>
     <div id="conflict" class="grid"></div>
@@ -48,7 +51,7 @@
   </section>
 
   <section>
-    <h2>H3 · Curvature over training</h2>
+    <h2>H3 · Curvature over training <a class="sketch" href="https://n-herling-mk1.github.io/ATLAS_LATHE_explorer/#expect" title="the pre-registered sketch for this panel">sketch ↗</a></h2>
     <p class="q">Largest (\(\lambda_{\max}\)) and most negative (\(\lambda_{\min}\)) Hessian eigenvalue of the total loss on the probe batch. Thick = group median, thin = individual runs. Checkpoint-only runs show the final point only.</p>
     <div class="pair">
       <div id="lamMax" class="plot"></div>
@@ -57,7 +60,7 @@
   </section>
 
   <section>
-    <h2>H4 · Seed-pair barriers</h2>
+    <h2>H4 · Seed-pair barriers <a class="sketch" href="https://n-herling-mk1.github.io/ATLAS_LATHE_explorer/#expect" title="the pre-registered sketch for this panel">sketch ↗</a></h2>
     <p class="q">Loss bump above the straight line between two seeds' weights. Hidden units can be permuted without changing the network, so compare groups of pairs with each other, not with zero. Prediction distance (right) is permutation-free.</p>
     <div class="pair">
       <div id="barriers" class="plot"></div>
@@ -68,13 +71,13 @@
   </section>
 
   <section>
-    <h2>Minibatch vs full-sample dCor</h2>
+    <h2>Minibatch vs full-sample dCor <a class="sketch" href="https://n-herling-mk1.github.io/ATLAS_LATHE_explorer/#expect" title="the pre-registered sketch for this panel">sketch ↗</a></h2>
     <p class="q">DisCo is a batch statistic. Points above the diagonal: training saw more dependence per minibatch than exists in the full sample (small-sample bias); the gap shrinks as the DisCo batch grows.</p>
     <div id="dcor" class="plot"></div>
   </section>
 
   <section>
-    <h2>Fingerprint vs metric <span class="tag">exploratory</span></h2>
+    <h2>Fingerprint vs metric <span class="tag">exploratory</span> <a class="sketch" href="https://n-herling-mk1.github.io/ATLAS_LATHE_explorer/#expect">kill-test sketch ↗</a></h2>
     <p class="q">Any fingerprint feature against any ledger metric. Looking here is not the kill test: that runs once, pre-registered, on held-out data.</p>
     <div class="controls inline">
       <label>x <select id="xFeat"></select></label>

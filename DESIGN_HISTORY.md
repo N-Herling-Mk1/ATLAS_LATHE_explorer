@@ -321,6 +321,7 @@ Measuring both separates "the landscape changed as intended" from "the metric mo
 | mk1 | 2026-11-07 | Probes, recorder, CLI, site (H1–H4, dCor, scatter, table), smoke test, base-run plan |
 | mk2 | 2026-11-08 | $\rho$ and $\kappa$; H2 caption fixed; Info page; KaTeX math; screenshot |
 | mk3 | 2026-11-09 | Refactor: `lfp/probes/` subpackage, CLI split (`summary`, `site_build`, `killtest`, `log`), site moved into the package as package data, `adapters/` and `docs/`, `lfp` console script, `set_dcor_squared()`; this document |
+| mk4 | 2026-11-09 | Public UI rebuilt: root `index.html` (hero, fingerprint definitions, the 7 Nov hypothesis sketches with hypothesis/null toggles, explorer status, pipeline, open decisions), LATHE mark + project logo, favicons; explorer template restyled to match, with a no-data state and links from each panel back to its sketch; built explorers publish to `explorer/` |
 
 ---
 

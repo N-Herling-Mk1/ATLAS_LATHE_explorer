@@ -1,6 +1,15 @@
 (async function () {
   "use strict";
-  const D = window.LFP_DATA || (await fetch("data/bundle.json").then((r) => r.json()));
+  const D = window.LFP_DATA || (await fetch("data/bundle.json").then((r) => (r.ok ? r.json() : null)).catch(() => null));
+  if (!D) {  // template opened without a build (e.g. lfp/site/ on the public site): say so instead of failing silently
+    document.querySelector("nav.controls").style.display = "none";
+    document.querySelector("main").innerHTML = `<div class="nodata"><h2>No fingerprint bundle here</h2>
+      <p class="q">This is the explorer template. It shows measured panels only after a build writes <code>data/bundle.js</code> next to it:</p>
+      <pre>python -m lfp build-site --fp fp\\stage1 --ledger runs\\stage1\\grade\\ledger.csv --key name --out explorer --clean</pre>
+      <p class="q">Published builds live under <a href="https://n-herling-mk1.github.io/ATLAS_LATHE_explorer/explorer/">/explorer/</a>.
+      The pre-registered sketches are on the <a href="https://n-herling-mk1.github.io/ATLAS_LATHE_explorer/#expect">home page</a>.</p></div>`;
+    return;
+  }
   const C = { bg: "#0a1016", line: "#14303a", ink: "#d8f6fb", ink2: "#8fb3bb", mute: "#5b7880",
               cyan: "#22e3ff", orange: "#ff8a2a", warn: "#fab219" };
   const DASH = ["solid", "dash", "dot", "dashdot", "longdash", "longdashdot"];
@@ -16,7 +25,7 @@
     const axis = { gridcolor: C.line, zerolinecolor: "#24505c", linecolor: C.line, tickfont: { size: 10 } };
     const base = {
       paper_bgcolor: C.bg, plot_bgcolor: C.bg,
-      font: { family: "JetBrains Mono, Consolas, Menlo, monospace", size: 11, color: C.ink2 },
+      font: { family: "Share Tech Mono, JetBrains Mono, Consolas, Menlo, monospace", size: 11, color: C.ink2 },
       margin: { l: 58, r: 16, t: 30, b: 46 },
       legend: { orientation: "h", y: 1.14, x: 0, font: { size: 11 } },
       hoverlabel: { bgcolor: "#0f1a22", bordercolor: C.cyan, font: { color: C.ink, size: 11 } },
