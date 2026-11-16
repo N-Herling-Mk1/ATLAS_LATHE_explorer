@@ -160,7 +160,7 @@
 
   // ======================================================================= dCor gap
   function dcor(svg, s) {
-    const g = base(svg, "full-sample dCor²", "minibatch dCor²");
+    const g = base(svg, "full-sample dCor²", "minibatch dCor² − shuffled floor");
     el("line", { x1: sx(0), y1: sy(0), x2: sx(1), y2: sy(1), stroke: C.mute, "stroke-dasharray": "3 4" }, g);
     el("text", { x: sx(0.86), y: sy(0.86) + 15, "text-anchor": "middle", class: "ax", transform: `rotate(${-Math.atan2(Y0 - Y1, X1 - X0) * 180 / Math.PI} ${sx(0.86)} ${sy(0.86) + 15})` }, g, "no bias");
     const xs = [0.12, 0.22, 0.33, 0.45, 0.58];
@@ -221,8 +221,8 @@
       "Pairs involving seed 8005 sit far above the healthy-pair floor, and their predictions differ too: 8005 converged into a separate basin.",
       "8005's barrier matches the healthy pairs: it is the same basin, at a poorly converged point. That makes it an optimization problem, not a landscape one."] },
     dcor: { draw: dcor, read: [
-      "The minibatch dCor² sits above the full-sample value, most for small DisCo batches. DisCo is optimizing a biased target, so n_disco is a real knob.",
-      "Points fall on the diagonal at every batch size, so minibatch DisCo is unbiased here and n_disco can drop out of the pilot."] },
+      "Even after subtracting the shuffled-pair floor (the estimator's own small-batch bias), minibatch dCor² sits above the full-sample value, most for small DisCo batches. DisCo is optimizing a biased target, so n_disco is a real knob.",
+      "Once the shuffled-pair floor is subtracted, points fall on the diagonal at every batch size: the raw gap was only estimator bias, so n_disco can drop out of the pilot."] },
     kill: { draw: kill, read: [
       "Adding landscape coordinates drops held-out closure error below the permutation band. Fingerprints earn a place as TRUSS surrogate inputs.",
       "No family beats hyperparameters beyond the permutation band. Record that the map adds nothing a metrics table does not, and stop."] },

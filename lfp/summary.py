@@ -56,6 +56,8 @@ def summarize(docs, pairs, ledger=None, key="name"):
             dc = s.get("dcor") or {}
             if dc:
                 row["geo_dcor_gap"] = dc.get("gap")
+                row["geo_dcor_gap_excess"] = dc.get("gap_excess")
+                row["dcor_gap_null"] = dc.get("gap_null")
                 row["dcor_mini"] = dc.get("mini_mean")
                 row["dcor_full"] = dc.get("full")
         for snap in d.get("snapshots", []):

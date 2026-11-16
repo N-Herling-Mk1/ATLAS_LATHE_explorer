@@ -58,7 +58,7 @@
     <p>LATHE measures the geometry a trained classifier sits in: how sharp its basin is, where the <strong>BCE</strong> and <strong>α·DisCo</strong> terms pull against each other, and whether two seeds landed in the same valley. It then asks one question: <strong>does that geometry predict held-out ABCD closure better than the loss settings alone?</strong></p>
     <p>LATHE describes and maps. Any optimization that uses the map belongs to TRUSS, and only if the kill test passes. Otherwise LATHE would be grading its own exam.</p>
     <div class="chips">
-      <span class="chip c"><span class="dot"></span>lfp v0.3 · mk3</span>
+      <span class="chip c"><span class="dot"></span>lfp v0.3.1 · mk5</span>
       <span class="chip"><span class="dot"></span>smoke-tested end to end</span>
       <span class="chip o"><span class="dot blink"></span>ATLAS runs pending</span>
     </div>
@@ -105,8 +105,8 @@
     </div>
     <div class="card frame">
       <span class="tag">DisCo</span><h3>dCor gap</h3>
-      <div class="eq">\(\mathbb{E}_{\text{mb}}\big[\mathrm{dCor}^2\big] - \mathrm{dCor}^2_{\text{full}}\)</div>
-      <p>DisCo is a batch statistic. If minibatches see more dependence than the full background sample, training optimizes a biased version of the target.</p>
+      <div class="eq">\(\Delta = \big(\mathbb{E}_{\text{mb}}[\mathrm{dCor}^2] - \mathrm{dCor}^2_{\text{full}}\big) - \big(\cdots\big)_{\text{shuffled}}\)</div>
+      <p>DisCo is a batch statistic, and the V-statistic is biased upward at small n even for independent scores. The same gap on shuffled pairs measures that floor; only the excess Δ says training optimized a biased target.</p>
     </div>
     <div class="card frame">
       <span class="tag">KILL</span><h3>From fingerprint to verdict</h3>
@@ -169,11 +169,11 @@
 
     <article class="sk frame" data-sketch="dcor">
       <div class="sk-head"><span class="sk-id">dCor</span><h3>Is DisCo chasing a biased target?</h3></div>
-      <p class="q">If minibatch dCor² sits above the full-sample value, more so for small DisCo batches, then the batch size n<sub>disco</sub> is a real hyperparameter.</p>
+      <p class="q">If minibatch dCor² sits above the full-sample value by more than the shuffled-pair floor, more so for small DisCo batches, then the batch size n<sub>disco</sub> is a real hyperparameter.</p>
       <svg role="img" aria-label="Schematic: minibatch versus full-sample distance correlation"></svg>
       <div class="ctl"><span class="probe">probe · minibatch vs full-sample dCor² on background</span><div class="seg"><button data-v="exp" class="on">Hypothesis</button><button data-v="null">Null</button></div></div>
       <div class="reading"></div>
-      <div class="foot"><span class="tr">Tier <b>A</b> · n<sub>disco</sub> sweep in Tier <b>C</b></span><span>dCor vs dCor²: open decision 5</span></div>
+      <div class="foot"><span class="tr">Tier <b>A</b> · n<sub>disco</sub> sweep in Tier <b>C</b></span><span>TRUSS penalizes dCor² (decision 5 closed)</span></div>
     </article>
 
     <article class="sk frame" data-sketch="kill">
@@ -256,7 +256,7 @@
   <span class="d">site/</span>              <span class="m">explorer template (Plotly, no build step)</span>
 <span class="d">adapters/</span>            <span class="m">TEMPLATE.py</span>
 <span class="d">docs/</span>                <span class="m">DESIGN_HISTORY · BASE_RUN_PLAN</span>
-<span class="d">tests/</span>               <span class="m">9 analytic probe checks</span>
+<span class="d">tests/</span>               <span class="m">11 analytic probe checks</span>
 <span class="d">examples/</span>            <span class="m">sklearn smoke test</span>
 <span class="d">assets/</span> <span class="f">index.html</span>    <span class="m">this page</span>
 <span class="d">explorer/</span>            <span class="m">published build (once runs exist)</span></pre>
@@ -270,7 +270,7 @@
   <h2>Status &amp; <span class="hl">open decisions</span></h2>
   <div class="rule"></div>
   <div class="checks">
-    <div class="check frame"><span class="s done">DONE</span><span>Probes implemented; 9 analytic correctness checks pass.</span></div>
+    <div class="check frame"><span class="s done">DONE</span><span>Probes implemented; 11 analytic correctness checks pass.</span></div>
     <div class="check frame"><span class="s done">DONE</span><span>Recorder leaves training bit-for-bit unchanged; in-training and post-hoc fingerprints agree exactly.</span></div>
     <div class="check frame"><span class="s done">DONE</span><span>End-to-end smoke test (train → probe → pairs → site → killtest) on a public sklearn table.</span></div>
     <div class="check frame"><span class="s next">NEXT</span><span>Tier A on the Stage 1 checkpoints: first ATLAS fingerprints, and the seed SD of every feature.</span></div>
@@ -280,12 +280,12 @@
     <table class="dec">
       <thead><tr><th>#</th><th>Open decision</th><th>Why it matters</th></tr></thead>
       <tbody>
-        <tr><td>1</td><td>Stall thresholds (κ &lt; 0.3, 1/3 &lt; ρ &lt; 3) or a rank rule</td><td>Fix before any ATLAS fingerprint is seen</td></tr>
-        <tr><td>2</td><td>Is there an unused held-out partition for the lockbox?</td><td>Needed before any loop optimizes φ</td></tr>
-        <tr><td>3</td><td>Were α = 32 Stage 1 checkpoints saved?</td><td>Tier A positive control (seed 8005)</td></tr>
+        <tr><td>1</td><td>Stall rule: proposed within-network rank rule + α-monotonicity (the κ/ρ thresholds collapse to one condition on κ)</td><td>Lock before any ATLAS fingerprint is seen</td></tr>
+        <tr><td>2</td><td>Lockbox: Stage 1 has none (no event is held out from every run)</td><td>Carve one before any loop optimizes φ</td></tr>
+        <tr><td>3</td><td><span class="c">Settled:</span> all Stage 1 checkpoints saved, α ∈ {0, 4, 8, 16, 32} + 2 queen cells, 10 seeds × 5 folds</td><td>Tier A has its positive control (seed 8005)</td></tr>
         <tr><td>4</td><td>Stage 2 status</td><td>Needed for the <code>pinch_probe</code> cross-check</td></tr>
-        <tr><td>5</td><td>DisCo convention in training: dCor or dCor²?</td><td><code>set_dcor_squared(False)</code> if dCor</td></tr>
-        <tr><td>6</td><td>What TRUSS's DisCo decorrelates against (NN2 score or a fixed variable)</td><td>Goes into the adapter's <code>disco_pair</code></td></tr>
+        <tr><td>5</td><td><span class="c">Settled:</span> dCor², on a 1,024-event background draw</td><td>lfp default is correct</td></tr>
+        <tr><td>6</td><td><span class="c">Settled:</span> double DisCo, NN1 score vs NN2 score on background</td><td>Pinch points ranked within each network</td></tr>
         <tr><td>7</td><td>Is the DisCo implementation twice differentiable?</td><td>Check with one <code>lfp probe</code> run</td></tr>
         <tr><td>8</td><td>Outer objective for any loss search: Pareto front or Z<sub>A</sub></td><td>Z<sub>A</sub> rewarded the unstable α = 32 cell in Stage 1</td></tr>
         <tr><td>9</td><td>α schedules (τ) in the first pilot, or held back</td><td>The α = 32 instability is the sharpest Stage 1 finding</td></tr>

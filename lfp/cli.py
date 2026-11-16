@@ -48,6 +48,10 @@ def cmd_probe(args):
     ad = load_adapter(args.adapter)
     runs = list(ad.list_runs(args.runs))
     filters = _parse_filters(args.filter)
+    if filters and hasattr(ad, "run_meta"):  # filter on cheap metadata before loading any weights
+        n_all = len(runs)
+        runs = [r for r in runs if _meta_match(ad.run_meta(r), filters)]
+        log(f"probe: {len(runs)}/{n_all} runs match {filters}")
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     probes = tuple(args.probes.split(",")) if args.probes else PROBES_FINAL

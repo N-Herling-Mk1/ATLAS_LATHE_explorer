@@ -44,7 +44,7 @@ Start with [docs/DESIGN_HISTORY.md](docs/DESIGN_HISTORY.md) for the why; this RE
 ```powershell
 python -m venv .venv ; .venv\Scripts\activate
 pip install -e .                     # or: pip install -r requirements.txt
-python -m pytest -q                  # 9 analytic checks (or: python tests\test_probes.py)
+python -m pytest -q                  # 11 analytic checks (or: python tests\test_probes.py)
 python examples\smoke_sklearn\run_smoke.py   # ~20 s; then open smoke_out\site\index.html
 ```
 

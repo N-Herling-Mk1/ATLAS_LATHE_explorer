@@ -128,6 +128,36 @@ def test_dcor_gap_small_batches_biased_up():
     assert g["mini_mean"] > g["full"] and g["gap"] > 0
 
 
+def test_dcor_gap_excess_near_zero_when_independent():
+    # Independent scores: the whole gap is estimator bias, so the shuffled baseline should absorb it.
+    torch.manual_seed(3)
+    a, b = torch.randn(6000), torch.randn(6000)
+    m = Quad(torch.randn(2, 2))
+    h = RunHandle("d", {}, m, lambda mod, bt: {"bce": mod.W.sum()}, {"bce": 1.0}, torch.zeros(1),
+                  disco_pair=lambda mod, bt: (a, b), disco_batch=0, disco_minibatch=64)
+    g = probes.dcor_gap(h, n_full=4000, reps=200)
+    assert g["gap"] > 0 and g["gap_null"] > 0
+    assert abs(g["gap_excess"]) < 0.25 * g["gap_null"]
+
+
+def test_dcor_gap_null_floor_depends_on_marginals_only():
+    # The shuffled floor is a property of the marginals and n_mini, not of the dependence.
+    # Measured: with linear dependence the raw gap shrinks below the floor (excess slightly
+    # negative, within ~1 minibatch sd), so a positive raw gap alone never shows DisCo bias.
+    out = {}
+    for rho in (0.0, 0.6):
+        torch.manual_seed(4)
+        a = torch.randn(6000)
+        b = rho * a + torch.randn(6000)
+        m = Quad(torch.randn(2, 2))
+        h = RunHandle("d", {}, m, lambda mod, bt: {"bce": mod.W.sum()}, {"bce": 1.0}, torch.zeros(1),
+                      disco_pair=lambda mod, bt: (a, b), disco_batch=0, disco_minibatch=64)
+        out[rho] = probes.dcor_gap(h, n_full=4000, reps=200)
+    assert abs(out[0.6]["gap_null"] - out[0.0]["gap_null"]) < 0.2 * out[0.0]["gap_null"]
+    assert out[0.6]["full"] > out[0.6]["null_full"]
+    assert abs(out[0.6]["gap_excess"]) < out[0.6]["mini_sd"]
+
+
 def test_snapshot_leaves_global_rng_alone():
     a = torch.rand(3, 3) + 0.1
     h = quad_handle(a, a, torch.randn(3, 3))

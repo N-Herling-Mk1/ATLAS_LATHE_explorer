@@ -277,7 +277,7 @@
   let sortCol = null, sortDir = 1;
   function drawTable() {
     const led = cols.filter((c) => /^led_/.test(c)).slice(0, 8);
-    const head = ["run_id", groupKey, "source", "snaps", "geo_lam_max", "geo_lam_min", "geo_cos_global", "geo_slice_width", "geo_slice_rough", "geo_barrier_mean", "geo_dcor_gap", ...led, "flags"];
+    const head = ["run_id", groupKey, "source", "snaps", "geo_lam_max", "geo_lam_min", "geo_cos_global", "geo_slice_width", "geo_slice_rough", "geo_barrier_mean", "geo_dcor_gap", "geo_dcor_gap_excess", ...led, "flags"];
     let rows = runs.map((r) => { const s = summaryById[r.run_id] || {}; const fh = (finalSnap(r) || {}).hessian || {};
       const flags = [fh.error ? "hessian non-finite" : "", fh && fh.converged === false && !fh.error ? "not converged" : ""].filter(Boolean).join("; ");
       return Object.assign({}, s, { run_id: r.run_id, [groupKey]: groupOfRun(r), source: r.source, snaps: (r.snapshots || []).length, flags }); });

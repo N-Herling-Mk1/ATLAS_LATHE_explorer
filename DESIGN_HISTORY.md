@@ -322,6 +322,7 @@ Measuring both separates "the landscape changed as intended" from "the metric mo
 | mk2 | 2026-11-08 | $\rho$ and $\kappa$; H2 caption fixed; Info page; KaTeX math; screenshot |
 | mk3 | 2026-11-09 | Refactor: `lfp/probes/` subpackage, CLI split (`summary`, `site_build`, `killtest`, `log`), site moved into the package as package data, `adapters/` and `docs/`, `lfp` console script, `set_dcor_squared()`; this document |
 | mk4 | 2026-11-09 | Public UI rebuilt: root `index.html` (hero, fingerprint definitions, the 7 Nov hypothesis sketches with hypothesis/null toggles, explorer status, pipeline, open decisions), LATHE mark + project logo, favicons; explorer template restyled to match, with a no-data state and links from each panel back to its sketch; built explorers publish to `explorer/` |
+| mk5 | 2026-11-16 | dCor gap gets a shuffled-pair baseline (`gap_null`, `gap_excess`): the V-statistic is biased upward at small n even for independent scores, and its bias shrinks with dependence, so a raw positive gap is not a finding; summary column `geo_dcor_gap_excess`; site sketch and card updated; `lfp probe` filters on `run_meta` before loading weights; v0.3.1 |
 
 ---
 
