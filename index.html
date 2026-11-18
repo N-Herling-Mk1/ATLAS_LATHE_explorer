@@ -24,6 +24,7 @@
 
 <header class="top">
   <div class="top-in">
+    <div id="etch-slot" class="etch-slot" aria-hidden="false"></div>
     <a class="brand" href="#overview" aria-label="LATHE home">
       <img src="assets/icons/lathe-mark-120h.png" alt="">
       <span>
@@ -35,6 +36,7 @@
     <nav class="nav">
       <a href="#fingerprint">Fingerprint</a>
       <a href="#expect">Expectations</a>
+      <a href="#plan">Plan</a>
       <a href="#explorer">Explorer</a>
       <a href="#pipeline">Pipeline</a>
       <a href="#status">Status</a>
@@ -187,9 +189,56 @@
   </div>
 </section>
 
+<!-- ================================================================= PLAN -->
+<section id="plan" class="blk">
+  <p class="kicker"><span class="n">03</span>The end goal</p>
+  <h2>Searching <span class="hl">landscape space</span></h2>
+  <div class="rule"></div>
+  <p class="lead">Find architectures and loss settings that give ABCD-safe classifiers (good closure, good discrimination, stable across seeds) by scoring candidates on their landscape instead of training each one to the end. It only pays if the fingerprint predicts held-out closure better than the settings alone, so that is tested first.</p>
+
+  <div class="plan-sheet">
+  <div class="flow">
+    <div class="fbox frame"><b>Settings</b><span>architecture \(A\)</span><span>loss \(\phi\): \(\alpha,\ \tau,\ n_{\text{disco}},\ \beta,\ \gamma\)</span><span>seed</span></div>
+    <div class="farrow"><span class="fl">\(F\): train + probe</span></div>
+    <div class="fbox frame"><b>Fingerprint \(f\)</b><span>curvature · slices</span><span>layer conflict · barriers</span><span>epochs 1–20 + final</span></div>
+    <div class="farrow"><span class="fl">\(G\): predict</span></div>
+    <div class="fbox frame"><b>Outcome \(m\)</b><span>held-out closure</span><span>AUC</span><span>seed spread</span></div>
+    <div class="farrow short"></div>
+    <div class="gate"><div><b>Kill test</b><span>does \(\hat G(f)\) beat \(\hat H(\phi)\)?</span></div></div>
+    <div class="nogo"><span class="lab">no →</span> search \(\phi\) directly; retire the map</div>
+  </div>
+
+  <div class="yes"><span>yes</span></div>
+  <p class="sub-h"><span class="tag-truss">TRUSS runs the loop</span> three ways to search, in order of ambition</p>
+  <div class="routes">
+    <div class="route frame"><h3>1 · Surrogate search, early read</h3><p>Train a batch for 5–10 epochs, fingerprint it, let \(\hat G\) predict the final metrics, and finish only the top few.</p><p class="m">Wins if early fingerprints predict (A4) and \(\hat G\) carries across architectures (A3).</p></div>
+    <div class="route frame"><h3>2 · Inverse design</h3><p>Pick a target landscape \(f^\star\) where \(\hat G\) predicts good closure, then search \(A, \phi\) to land in it.</p><p class="m">\(F\) is many-to-one: the result is a ranked shortlist, not one answer.</p></div>
+    <div class="route frame"><h3>3 · Landscape terms in the loss</h3><p>Curvature-gated \(\alpha\) · gradient surgery at pinch layers · flatness penalty · per-network DisCo weights.</p><p class="m">Each becomes a new \(\phi\) dimension, judged like any other setting.</p></div>
+  </div>
+
+  <p class="sub-h">How we know it worked</p>
+  <div class="checks3">
+    <div class="frame"><b>Objective</b><p>\(J = \widetilde{\text{closure}} + \lambda\,\sigma_{\text{seed}}(\text{closure})\)</p><p class="fnote">subject to \(\text{AUC} \ge \text{AUC}_{\text{base}}\). Seed spread is priced, not just the mean.</p></div>
+    <div class="frame"><b>Control arm</b><p>plain search over \(\phi\) at the same compute budget</p><p class="fnote">pre-registered; the only result that justifies the approach</p></div>
+    <div class="frame"><b>Confirm</b><p>top 3 settings · fresh seeds · lockbox</p><p class="fnote">graded on data no search ever touched</p></div>
+  </div>
+
+  <p class="sub-h">Build order</p>
+  <div class="build">
+    <div class="bstep done"><i>01</i>Tier A: final-state fingerprints<em>done</em></div>
+    <div class="bstep"><i>02</i>Fold-level labels</div>
+    <div class="bstep"><i>03</i>Weight-matched seed barriers</div>
+    <div class="bstep"><i>04</i>Tier B: training trajectories</div>
+    <div class="bstep gatestep"><i>05</i>Tier C pilot: the kill test</div>
+    <div class="bstep truss"><i>06</i>TRUSS search loop + control arm</div>
+  </div>
+  <p class="boardlink">Working version: <a href="https://claude.ai/artifact/3CQpw15VQ3UL641zwjamq1">LATHE · searching landscape space</a> (whiteboard, collaborators only).</p>
+  </div>
+</section>
+
 <!-- ================================================================= EXPLORER -->
 <section id="explorer" class="blk">
-  <p class="kicker"><span class="n">03</span>Measured</p>
+  <p class="kicker"><span class="n">04</span>Measured</p>
   <h2>The <span class="hl">explorer</span></h2>
   <div class="rule"></div>
   <p class="lead">The explorer is generated, not hand-written. Fingerprints come from runs executed locally (the ML sig/bg training), <code>lfp build-site</code> aggregates them with the run ledger, and the result is published under <code>explorer/</code>. It has one measured panel for every sketch above.</p>
@@ -221,7 +270,7 @@
 
 <!-- ================================================================= PIPELINE -->
 <section id="pipeline" class="blk">
-  <p class="kicker"><span class="n">04</span>How it runs</p>
+  <p class="kicker"><span class="n">05</span>How it runs</p>
   <h2>From checkpoint to <span class="hl">site</span></h2>
   <div class="rule"></div>
   <div class="rail">
@@ -266,7 +315,7 @@
 
 <!-- ================================================================= STATUS -->
 <section id="status" class="blk">
-  <p class="kicker"><span class="n">05</span>Where it stands</p>
+  <p class="kicker"><span class="n">06</span>Where it stands</p>
   <h2>Status &amp; <span class="hl">open decisions</span></h2>
   <div class="rule"></div>
   <div class="checks">
@@ -311,6 +360,7 @@
   </div>
 </footer>
 
+<script src="assets/js/etch.js"></script>
 <script src="assets/js/sketches.js"></script>
 <script src="assets/js/site.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
