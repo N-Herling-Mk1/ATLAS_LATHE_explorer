@@ -109,11 +109,11 @@
   }
 
   // ------------------------------------------------------------------ state
-  const S = { el: 0, yaw: 0.3, pitch: -0.42, particles: [], flashes: [], edges: [], edgeSet: new Set(), filled: [],
+  const S = { el: 0, yaw: 0.3, pitch: -0.42, particles: [], flashes: [], smoke: [], edges: [], edgeSet: new Set(), filled: [],
               zoom: 1, zoomT: 1, cage: 1, docked: false, docking: false, scanT: -1, nextScan: 0 };
   function resetSim(el0) {
-    S.el = el0 || 0; S.particles.length = 0; S.flashes.length = 0; S.edges.length = 0; S.edgeSet.clear(); S.filled.length = 0;
-    for (const p of pts) p.dep = false;
+    S.el = el0 || 0; S.particles.length = 0; S.flashes.length = 0; S.smoke.length = 0; S.edges.length = 0; S.edgeSet.clear(); S.filled.length = 0;
+    for (const p of pts) { p.dep = false; p.depT = -9; }
     for (const e of emitters) { e.rS = { done: 0, dep: 0, part: null }; e.cS = { done: 0, dep: 0, part: null }; e.nQ = 0; e.pos = { ...ORIGIN }; e.tip = null; e.glow = 0; }
   }
   resetSim(0);
@@ -126,14 +126,14 @@
     W = Math.max(1, r.width); H = Math.max(1, r.height);
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    S.zoomT = S.docked ? Math.min(W / 330, H / 205) : Math.min(W / 420, H / 430);
+    S.zoomT = S.docked ? Math.min(W / 350, H / 228) : Math.min(W / 420, H / 430);
   }
   function project(p) {
     const cy = Math.cos(S.yaw), sy = Math.sin(S.yaw), cp = Math.cos(S.pitch), sp = Math.sin(S.pitch);
     const x1 = p.x * cy - p.z * sy, z1 = p.x * sy + p.z * cy;
     const y1 = p.y * cp - z1 * sp, z2 = p.y * sp + z1 * cp;
     const f = (700 / (700 + z2 + 300)) * S.zoom;
-    return { x: W / 2 + x1 * f, y: H / 2 + y1 * f, s: f, z: z2 };
+    return { x: W / 2 + x1 * f, y: H * (S.docked ? 0.57 : 0.5) + y1 * f, s: f, z: z2 };
   }
   const clamp = (x) => Math.max(0, Math.min(1, x));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -150,22 +150,40 @@
     return "rgb(253,231,37)";
   }
 
+  // ------------------------------------------------------------------ sprites: smoke puff + warm underglow
+  function sprite(stops) {
+    const c = document.createElement("canvas"); c.width = c.height = 64;
+    const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    stops.forEach(([o, col]) => gr.addColorStop(o, col)); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    return c;
+  }
+  const SMOKE = sprite([[0, "rgba(170,180,188,.55)"], [0.45, "rgba(120,132,140,.28)"], [1, "rgba(90,100,110,0)"]]);
+  const EMBER = sprite([[0, "rgba(255,150,60,.7)"], [0.5, "rgba(255,90,20,.25)"], [1, "rgba(255,60,0,0)"]]);
+
   // ------------------------------------------------------------------ sparks
   function sparks(p, n, I, flash) {
-    if (S.particles.length > 1400 || reduce) return;
-    if (flash && S.flashes.length < 12) S.flashes.push({ x: p.x, y: p.y, z: p.z, life: 1, decay: 0.12, size: 2 + 1.5 * I });
-    for (let i = 0; i < n * 3; i++) {
-      const a = Math.random() * Math.PI * 2, e = Math.random() * Math.PI - Math.PI / 2, sp = 1.5 + Math.random() * 3.5 * I;
+    if (S.particles.length > 2600 || reduce) return;
+    if (flash && S.flashes.length < 16) S.flashes.push({ x: p.x, y: p.y, z: p.z, life: 1, decay: 0.1, size: 2.2 + 1.6 * I });
+    for (let i = 0; i < n * 4; i++) {            // white-hot streaks
+      const a = Math.random() * Math.PI * 2, e = Math.random() * Math.PI - Math.PI / 2, sp = 1.5 + Math.random() * 4.5 * I;
       S.particles.push({ k: "s", x: p.x, y: p.y, z: p.z, px: p.x, py: p.y, pz: p.z,
-        vx: Math.cos(a) * Math.cos(e) * sp, vy: Math.sin(e) * sp - 0.3, vz: Math.sin(a) * Math.cos(e) * sp,
-        life: 1, decay: 0.05 + Math.random() * 0.07, col: Math.random() < 0.6 ? "#ffffff" : P.laserHot, size: 0.4 + Math.random() * 0.7 });
+        vx: Math.cos(a) * Math.cos(e) * sp, vy: Math.sin(e) * sp - 0.6, vz: Math.sin(a) * Math.cos(e) * sp,
+        life: 1, decay: 0.04 + Math.random() * 0.06, col: Math.random() < 0.55 ? "#ffffff" : P.laserHot, size: 0.4 + Math.random() * 0.8 });
     }
-    for (let i = 0; i < n; i++) {
-      const a = Math.random() * Math.PI * 2, e = Math.random() * 0.6 + 0.2, sp = 0.8 + Math.random() * 2 * I;
+    for (let i = 0; i < n * 2; i++) {            // molten ejecta: arc up, fall, cool white -> yellow -> orange -> red
+      const a = Math.random() * Math.PI * 2, e = Math.random() * 0.8 + 0.3, sp = 1 + Math.random() * 2.6 * I;
       S.particles.push({ k: "e", x: p.x, y: p.y, z: p.z, px: p.x, py: p.y, pz: p.z,
-        vx: Math.cos(a) * Math.cos(e) * sp, vy: -Math.sin(e) * sp, vz: Math.sin(a) * Math.cos(e) * sp,
-        life: 1, decay: 0.016 + Math.random() * 0.025, col: P.spark[(Math.random() * P.spark.length) | 0], size: 0.9 + Math.random() * 1.4, heat: 1 });
+        vx: Math.cos(a) * Math.cos(e) * sp, vy: -Math.sin(e) * sp * 1.4, vz: Math.sin(a) * Math.cos(e) * sp,
+        life: 1, decay: 0.012 + Math.random() * 0.02, col: P.spark[(Math.random() * P.spark.length) | 0], size: 0.9 + Math.random() * 1.6, heat: 1, bounced: 0 });
     }
+    if (Math.random() < 0.35 * n) smokePuff(p, I);
+  }
+  function smokePuff(p, I) {
+    if (S.smoke.length > 320 || reduce) return;
+    S.smoke.push({ x: p.x + (Math.random() - 0.5) * 4, y: p.y - 2, z: p.z + (Math.random() - 0.5) * 4,
+      vx: (Math.random() - 0.5) * 0.35, vy: -0.35 - Math.random() * 0.5 * (0.6 + I), vz: (Math.random() - 0.5) * 0.35,
+      r: 3 + Math.random() * 4, grow: 0.25 + Math.random() * 0.3, life: 1, decay: 0.008 + Math.random() * 0.01,
+      warm: 1, spin: Math.random() * 6 });
   }
   function stepParticles() {
     for (let i = S.flashes.length - 1; i >= 0; i--) if ((S.flashes[i].life -= S.flashes[i].decay) <= 0) S.flashes.splice(i, 1);
@@ -173,9 +191,18 @@
       const p = S.particles[i];
       p.px = p.x; p.py = p.y; p.pz = p.z;
       p.x += p.vx; p.y += p.vy; p.z += p.vz;
-      if (p.k === "s") { p.vy += 0.02; p.vx *= 0.88; p.vy *= 0.92; p.vz *= 0.88; }
-      else { p.vy += 0.09; p.vx *= 0.985; p.vz *= 0.985; p.heat = Math.max(0, p.heat - p.decay * 1.3); }
+      if (p.k === "s") { p.vy += 0.03; p.vx *= 0.88; p.vy *= 0.92; p.vz *= 0.88; }
+      else {
+        p.vy += 0.11; p.vx *= 0.985; p.vz *= 0.985; p.heat = Math.max(0, p.heat - p.decay * 1.1);
+        if (p.y > CUBE && p.vy > 0 && p.bounced < 2) { p.y = CUBE; p.vy *= -0.3; p.vx *= 0.6; p.vz *= 0.6; p.bounced++; }   // skitter on the bed
+      }
       if ((p.life -= p.decay) <= 0) S.particles.splice(i, 1);
+    }
+    for (let i = S.smoke.length - 1; i >= 0; i--) {
+      const m = S.smoke[i];
+      m.x += m.vx; m.y += m.vy; m.z += m.vz; m.vy *= 0.995; m.vx += (Math.random() - 0.5) * 0.04; m.vz += (Math.random() - 0.5) * 0.04;
+      m.r += m.grow; m.warm = Math.max(0, m.warm - 0.05);
+      if ((m.life -= m.decay) <= 0) S.smoke.splice(i, 1);
     }
   }
   const heat = (t) => (t > 0.85 ? "#ffffff" : t > 0.65 ? "#fff5d0" : t > 0.45 ? "#ffd870" : t > 0.25 ? "#ff8a2a" : t > 0.1 ? "#e8230a" : "#6a1408");
@@ -183,7 +210,7 @@
   // ------------------------------------------------------------------ path tracing (the precise part)
   function addEdge(a, b) {
     const key = a.id < b.id ? a.id * 4096 + b.id : b.id * 4096 + a.id;
-    if (!S.edgeSet.has(key)) { S.edgeSet.add(key); S.edges.push([a, b]); }
+    if (!S.edgeSet.has(key)) { S.edgeSet.add(key); S.edges.push([a, b, S.el]); }
   }
   // advance a tip along `path` to fraction f; completed segments become edges, visited vertices become anchors
   function trace(st, path, f, deposit) {
@@ -192,7 +219,7 @@
     while (st.done < i) { addEdge(path[st.done], path[st.done + 1]); st.done++; }
     if (f > 0) while (st.dep <= i) {
       const v = path[st.dep];
-      if (deposit && !v.dep) { v.dep = true; if (!jump) sparks(v, 2, 1, true); }
+      if (deposit && !v.dep) { v.dep = true; v.depT = jump ? -9 : S.el; if (!jump) sparks(v, 3, 1.15, true); }
       st.dep++;
     }
     if (f <= 0) { st.part = null; return path[0]; }
@@ -217,7 +244,7 @@
       const tC = trace(e.cS, e.cols, fC, false);
       const nQ = Math.floor(fF * e.quads.length);
       const jump = nQ - e.nQ > 6;
-      while (e.nQ < nQ) { const q = e.quads[e.nQ++]; S.filled.push(q); if (!jump && e.nQ % 2) sparks({ x: q.cx, y: q.cy, z: q.cz }, 1, 0.5, true); }
+      while (e.nQ < nQ) { const q = e.quads[e.nQ++]; q.fT = jump ? -9 : S.el; S.filled.push(q); if (!jump) sparks({ x: q.cx, y: q.cy, z: q.cz }, 1, 0.7, e.nQ % 2 === 1); }
       // emitter position
       if (el < T.splitA) e.pos = { ...ORIGIN };
       else if (el < T.splitB) e.pos = lerp3(ORIGIN, e.corner, ease((el - T.splitA) / (T.splitB - T.splitA)));
@@ -229,7 +256,7 @@
       else if (el >= T.rowsB && el < T.colsB) e.tip = tC;
       else if (el >= T.colsB && el < T.fillB) { const q = e.quads[Math.min(e.quads.length - 1, e.nQ)]; e.tip = { x: q.cx, y: q.cy, z: q.cz }; }
       else e.tip = null;
-      if (e.tip && dt > 0 && !S.docked) sparks(e.tip, 1, 0.45, false);
+      if (e.tip && dt > 0) { sparks(e.tip, S.docked ? 1 : 2, 0.75, false); if (Math.random() < 0.5) smokePuff(e.tip, 0.6); }
     }
     hud.style.opacity = el >= T.dot && !S.docking && !S.docked ? 1 : 0;
     hudPhase.textContent = el < T.cubeA ? "phase: laser on" : el < T.splitA ? "phase: cage" : el < T.splitB ? "phase: split ×4"
@@ -340,7 +367,12 @@
       for (const it of items) {
         ctx.globalAlpha = 0.9; ctx.fillStyle = viridis(it.q.t);
         ctx.beginPath(); ctx.moveTo(it.pa.x, it.pa.y); ctx.lineTo(it.pb.x, it.pb.y); ctx.lineTo(it.pc.x, it.pc.y); ctx.lineTo(it.pd.x, it.pd.y); ctx.closePath(); ctx.fill();
-        if (it.fresh <= 8 && el < T.fillB + 0.2) { ctx.strokeStyle = "#ffffff"; ctx.globalAlpha = (9 - it.fresh) / 10; ctx.lineWidth = 1.2 * lw; ctx.stroke(); }
+        const age = el - it.q.fT;
+        if (age >= 0 && age < 0.5) {             // freshly fused: white-hot, cooling to the viridis colour
+          const k = 1 - age / 0.5;
+          ctx.fillStyle = heat(k); ctx.globalAlpha = 0.75 * k; ctx.fill();
+          ctx.strokeStyle = "#ffffff"; ctx.globalAlpha = k; ctx.lineWidth = 1.2 * lw; ctx.stroke();
+        }
       }
     }
     // engraved lines (complete edges + the segment each tip is cutting right now)
@@ -352,6 +384,14 @@
       ctx.globalAlpha = 0.22 * dim; ctx.lineWidth = 2.4 * lw; ctx.stroke();
       ctx.globalAlpha = 0.9 * dim; ctx.lineWidth = 0.8 * lw; ctx.stroke();
     }
+    for (let i = S.edges.length - 1; i >= 0; i--) {      // freshly cut lines glow and cool (white -> orange -> cyan)
+      const [a0, b0, t0] = S.edges[i], age = el - t0;
+      if (age > 0.7) break;
+      if (age < 0) continue;
+      const k = 1 - age / 0.7, a = project(a0), b = project(b0);
+      ctx.strokeStyle = heat(k); ctx.globalAlpha = 0.95 * k; ctx.lineWidth = (1 + 2.2 * k) * lw;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
     for (const e of emitters) for (const st of [e.rS, e.cS]) if (st.part) {
       const a = project(st.part[0]), b = project(st.part[1]);
       ctx.strokeStyle = "#ffffff"; ctx.globalAlpha = 0.95; ctx.lineWidth = 1.3 * lw;
@@ -360,7 +400,12 @@
     // anchors
     const dimA = 1 - 0.75 * fillFrac;
     for (const v of pts) if (v.dep) {
-      const p = project(v);
+      const p = project(v), age = el - v.depT;
+      if (age >= 0 && age < 0.6) {
+        const k = 1 - age / 0.6;
+        ctx.globalAlpha = 0.5 * k; ctx.fillStyle = heat(k);
+        ctx.beginPath(); ctx.arc(p.x, p.y, (2.2 + 3.2 * k) * p.s, 0, Math.PI * 2); ctx.fill();
+      }
       ctx.globalAlpha = 0.45 * dimA; ctx.fillStyle = P.laserHot;
       ctx.beginPath(); ctx.arc(p.x, p.y, 2.4 * p.s, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 0.9 * dimA; ctx.fillStyle = P.laser;
@@ -381,7 +426,7 @@
         if (e.tip) {
           const t = project(e.tip);
           beam(p, t, lw);
-          glowDot(t, 1.5 * Math.max(0.6, t.s), 0.95);
+          glowDot(t, (2.2 + 0.6 * Math.random()) * Math.max(0.6, t.s), 1);   // flickering melt pool
         }
         const r = 3.6 * p.s;
         ctx.fillStyle = P.laserHot; ctx.globalAlpha = 0.18 + e.glow * 0.45;
@@ -391,6 +436,14 @@
         ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.45, 0, Math.PI * 2); ctx.fill();
       }
       if (fs < 1) glowDot(o, 3 * (1 - fs) * Math.max(1, S.zoom), 1 - fs);
+    }
+    // smoke (drawn normally, so it dims what is behind it a little)
+    if (S.smoke.length) {
+      for (const m of S.smoke) {
+        const pr = project(m), r = m.r * pr.s, a = Math.min(1, m.life * 1.4);
+        ctx.globalAlpha = 0.5 * a; ctx.drawImage(SMOKE, pr.x - r, pr.y - r, 2 * r, 2 * r);
+        if (m.warm > 0) { ctx.globalAlpha = 0.25 * m.warm; ctx.drawImage(EMBER, pr.x - r * 0.7, pr.y - r * 0.7, 1.4 * r, 1.4 * r); }
+      }
     }
     // particles (additive)
     ctx.globalCompositeOperation = "lighter";
@@ -482,7 +535,7 @@
     if (!document.hidden) {
       if (!S.docked && !S.docking && S.el >= T.dock) startDock(T.dockDur);
       acc += dt;
-      const idle = S.docked && S.el >= T.retB + 0.6 && S.scanT < 0 && !S.particles.length;
+      const idle = S.docked && S.el >= T.retB + 0.6 && S.scanT < 0 && !S.particles.length && !S.smoke.length;
       if (!idle || acc >= 1 / 30) { update(idle ? acc : dt); render(); acc = 0; }   // ~30 fps when idle
     }
     requestAnimationFrame(frame);
@@ -501,7 +554,7 @@
 
   if (reduce) {
     dockNow(); S.cage = 0.22; S.el = T.retB + 1;
-    update(0); S.particles.length = 0; S.flashes.length = 0; render();
+    update(0); S.particles.length = 0; S.flashes.length = 0; S.smoke.length = 0; render();
     return;
   }
   if (deepLink) { dockNow(); resetSim(T.dot); }
