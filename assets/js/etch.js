@@ -11,9 +11,9 @@
  *   4.35–5.00  fill: quads are filled by loss value, low to high (viridis)
  *   5.00       the screen flies to its slot at the top of the hero's left column (1.3 s); emitters retract
  * Each beam ends exactly on the point being etched at that instant (the tip moves along the grid lines).
- * Docked (top of the hero's left column) it loops: wide orbit -> inspect four points computed from the surface
+ * Docked (top left of the hero) it loops, without re-etching: wide orbit -> inspect four points computed from the surface
  *   (global min A, saddle, local min B, steep slope) with a reticle, descent paths and a stats panel
- *   (θ, L, |∇L|, Hessian eigenvalues, κ, barrier) -> wide -> replay the etch. Scan line every 5 s.
+ *   (θ, L, |∇L|, Hessian eigenvalues, κ, barrier) -> wide -> ... Laser scan lines at random intervals.
  *   The surface is a demo function, not ATLAS data; the panel says so.
  * Click or any key during the splash skips to the dock. Click the docked screen to re-etch it.
  * A URL with a #section skips the full-screen part; prefers-reduced-motion shows a still, docked surface.
@@ -326,7 +326,7 @@
       if (tr.ph === "replay") { if (S.el >= T.retB) { tr.ph = "wide"; tr.t = 0; } }
       else if (tr.ph === "wide" && tr.t > TOUR.wide) { tr.ph = "poi"; tr.i = 0; tr.t = 0; }
       else if (tr.ph === "poi" && tr.t > TOUR.poi) { tr.t = 0; if (++tr.i >= POI.length) tr.ph = "back"; }
-      else if (tr.ph === "back" && tr.t > TOUR.back) { tr.ph = "replay"; tr.t = 0; resetSim(0); }
+      else if (tr.ph === "back" && tr.t > TOUR.back) { tr.ph = "wide"; tr.t = 0; }      // no replay: the etched surface stays
     }
     S.el = Math.min(T.retB + 1, S.el + dt);
     const el = S.el;
@@ -359,8 +359,11 @@
     // CRT scan every 5 s once docked and finished
     if (S.docked && el >= T.retB && !reduce) {
       const now = performance.now() / 1000;
-      if (S.scanT < 0 && now >= S.nextScan) { S.scanT = 0; S.nextScan = now + 5; }
-      if (S.scanT >= 0) { S.scanT += dt / 1.3; if (S.scanT > 1.25) S.scanT = -1; }
+      if (S.scanT < 0 && now >= S.nextScan) {                          // aperiodic: random gap, direction and speed
+        S.scanT = 0; S.scanDir = Math.random() < 0.5 ? 1 : -1; S.scanDur = 0.8 + Math.random() * 1.0;
+        S.nextScan = now + S.scanDur * 1.25 + 1.8 + Math.random() * 5.5;
+      }
+      if (S.scanT >= 0) { S.scanT += dt / (S.scanDur || 1.3); if (S.scanT > 1.25) S.scanT = -1; }
     }
     stepParticles();
   }
@@ -404,7 +407,7 @@
   function drawTag() {                   // small status line, bottom left of the screen
     const fs = Math.max(8, Math.min(11, W / 60)), tr = S.tour;
     const txt = tr.ph === "poi" ? "INSPECT " + (tr.i + 1) + "/" + POI.length + " \u00b7 " + POI[tr.i].title.split(" \u00b7 ")[0]
-      : tr.ph === "replay" ? (S.el < T.retB ? "ETCH \u00b7 replay" : "ETCH") : "WIDE \u00b7 orbit";
+      : tr.ph === "replay" ? "ETCH" : "WIDE \u00b7 orbit";
     ctx.globalCompositeOperation = "source-over";
     ctx.font = fs + 'px "Share Tech Mono", monospace'; ctx.textBaseline = "alphabetic";
     ctx.globalAlpha = 0.85; ctx.fillStyle = tr.ph === "poi" ? P.orange : P.cyan;
@@ -616,10 +619,17 @@
     if (S.docked) drawTag();
     // CRT laser scan
     if (S.scanT >= 0) {
-      const y = -0.08 * H + S.scanT * 1.16 * H;
-      const trail = ctx.createLinearGradient(0, y - H * 0.32, 0, y);
+      const dir = S.scanDir || 1, k = dir > 0 ? S.scanT : 1.25 - S.scanT;
+      const y = -0.08 * H + k * 1.16 * H, tl = H * 0.32 * dir;                // phosphor trail behind the beam
+      const trail = ctx.createLinearGradient(0, y - tl, 0, y);
       trail.addColorStop(0, "rgba(34,227,255,0)"); trail.addColorStop(1, "rgba(34,227,255,0.16)");
-      ctx.globalAlpha = 1; ctx.fillStyle = trail; ctx.fillRect(0, y - H * 0.32, W, H * 0.32);
+      ctx.globalAlpha = 1; ctx.fillStyle = trail; ctx.fillRect(0, Math.min(y, y - tl), W, Math.abs(tl));
+      ctx.lineCap = "round";                                                  // mesh lines re-lit where the beam crosses
+      for (const [a0, b0] of S.edges) {
+        const a = project(a0), b = project(b0), d = Math.abs((a.y + b.y) / 2 - y);
+        if (d < H * 0.05) { ctx.globalAlpha = 0.9 * (1 - d / (H * 0.05)); ctx.strokeStyle = "#bff6ff"; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+      }
       for (const v of pts) {
         const p = project(v), d = Math.abs(p.y - y);
         if (d < H * 0.06) {
@@ -700,7 +710,7 @@
   }
   crt.addEventListener("click", () => {
     if (!S.docked) return skipAhead();
-    if (S.el >= T.retB) { resetSim(0); S.tour.ph = "replay"; S.tour.t = 0; }  // re-etch in place
+    if (S.el >= T.retB) { resetSim(T.dot); S.tour.ph = "replay"; S.tour.t = 0; }  // re-etch in place (no welcome text)
   });
   window.addEventListener("keydown", () => skipAhead(), { once: true });
   window.addEventListener("resize", () => { fit(); if (reduce) render(); });
@@ -710,6 +720,7 @@
     update(0); S.particles.length = 0; S.flashes.length = 0; S.smoke.length = 0; render();
     return;
   }
+  if ("ResizeObserver" in window) new ResizeObserver(() => { if (S.docked) { fit(); if (reduce) render(); } }).observe(slot);
   if ("IntersectionObserver" in window) new IntersectionObserver((es) => { S.visible = es[0].isIntersecting; }, { threshold: 0.01 }).observe(slot);
   if (deepLink) { dockNow(); resetSim(T.dot); }
   else { document.documentElement.classList.add("etch-lock"); fit(); S.zoom = S.zoomT; }

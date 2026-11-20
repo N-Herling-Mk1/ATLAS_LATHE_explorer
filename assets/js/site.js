@@ -39,6 +39,14 @@
       .catch(() => { /* leave the waiting state that ships in the HTML */ });
   }
 
+  // back to top
+  const top = $(".totop");
+  if (top) {
+    const tick = () => top.classList.toggle("show", window.scrollY > 520);
+    window.addEventListener("scroll", tick, { passive: true }); tick();
+    top.addEventListener("click", (e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); history.replaceState(null, "", location.pathname); });
+  }
+
   // KaTeX
   window.addEventListener("load", () => {
     if (window.renderMathInElement) renderMathInElement(document.body, {
