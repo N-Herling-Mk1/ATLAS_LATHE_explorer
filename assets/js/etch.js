@@ -9,9 +9,12 @@
  *   2.90–3.75  rows: each emitter traces its quadrant row by row, burning the anchors and row lines
  *   3.75–4.35  columns: each emitter traces the column lines
  *   4.35–5.00  fill: quads are filled by loss value, low to high (viridis)
- *   5.00       the screen flies to its slot at the top left of the header (1.3 s); emitters retract
+ *   5.00       the screen flies to its slot at the top of the hero's left column (1.3 s); emitters retract
  * Each beam ends exactly on the point being etched at that instant (the tip moves along the grid lines).
- * Docked, it orbits slowly and a laser scan line sweeps the finished surface every 5 s (CRT).
+ * Docked (top of the hero's left column) it loops: wide orbit -> inspect four points computed from the surface
+ *   (global min A, saddle, local min B, steep slope) with a reticle, descent paths and a stats panel
+ *   (θ, L, |∇L|, Hessian eigenvalues, κ, barrier) -> wide -> replay the etch. Scan line every 5 s.
+ *   The surface is a demo function, not ATLAS data; the panel says so.
  * Click or any key during the splash skips to the dock. Click the docked screen to re-etch it.
  * A URL with a #section skips the full-screen part; prefers-reduced-motion shows a still, docked surface.
  */
@@ -84,6 +87,7 @@
       grid[r][c] = p; pts.push(p);
     }
   }
+  for (let i = 0; i <= 200; i++) for (let j = 0; j <= 200; j++) { const L = loss(j / 100 - 1, i / 100 - 1); lmin = Math.min(lmin, L); lmax = Math.max(lmax, L); }  // true range
   for (const p of pts) { p.t = (p.L - lmin) / (lmax - lmin); p.y = (0.55 - p.t) * HS; }
   const corners = [];
   for (let i = 0; i < 8; i++) corners.push({ x: (i & 1 ? 1 : -1) * CUBE, y: (i & 2 ? 1 : -1) * CUBE, z: (i & 4 ? 1 : -1) * CUBE });
@@ -108,8 +112,86 @@
                     rS: { done: 0, dep: 0, part: null }, cS: { done: 0, dep: 0, part: null }, nQ: 0, pos: { ...ORIGIN }, tip: null, glow: 0 });
   }
 
+  // ------------------------------------------------------------------ points of interest (computed from the demo surface)
+  const tn = (u, v) => (loss(u, v) - lmin) / (lmax - lmin);              // normalised loss, same scale as the colours
+  const surf = (u, v) => ({ x: u * EXT, y: (0.55 - tn(u, v)) * HS, z: v * EXT });
+  function local(u, v) {                                                // gradient + Hessian by central differences
+    const h = 1e-3, f0 = tn(u, v), fu1 = tn(u + h, v), fu0 = tn(u - h, v), fv1 = tn(u, v + h), fv0 = tn(u, v - h);
+    const gu = (fu1 - fu0) / (2 * h), gv = (fv1 - fv0) / (2 * h);
+    const a = (fu1 - 2 * f0 + fu0) / (h * h), d = (fv1 - 2 * f0 + fv0) / (h * h);
+    const b = (tn(u + h, v + h) - tn(u + h, v - h) - tn(u - h, v + h) + tn(u - h, v - h)) / (4 * h * h);
+    const m = (a + d) / 2, r = Math.sqrt(((a - d) / 2) ** 2 + b * b), l1 = m + r, l2 = m - r;
+    let vx = Math.abs(b) > 1e-9 ? l2 - d : (a < d ? 1 : 0), vy = Math.abs(b) > 1e-9 ? b : (a < d ? 0 : 1);
+    const n = Math.hypot(vx, vy) || 1;
+    return { t: f0, g: [gu, gv], gn: Math.hypot(gu, gv), lmax: l1, lmin: l2, vmin: [vx / n, vy / n], a, b, d };
+  }
+  function newton(u, v) {                                               // converge to the nearest stationary point
+    for (let k = 0; k < 40; k++) {
+      const q = local(u, v), det = q.a * q.d - q.b * q.b;
+      if (Math.abs(det) < 1e-9) break;
+      const du = (q.d * q.g[0] - q.b * q.g[1]) / det, dv = (-q.b * q.g[0] + q.a * q.g[1]) / det;
+      u -= du; v -= dv;
+      if (Math.hypot(du, dv) < 1e-8) break;
+    }
+    return [u, v];
+  }
+  const POI = (function () {
+    const M = 101, F = [];
+    for (let i = 0; i < M; i++) { F[i] = []; for (let j = 0; j < M; j++) F[i][j] = tn((j / (M - 1)) * 2 - 1, (i / (M - 1)) * 2 - 1); }
+    let mins = [];
+    for (let i = 1; i < M - 1; i++) for (let j = 1; j < M - 1; j++) {
+      let lo = true;
+      for (let di = -1; di <= 1 && lo; di++) for (let dj = -1; dj <= 1; dj++) if ((di || dj) && F[i + di][j + dj] <= F[i][j]) { lo = false; break; }
+      if (lo) { const [u, v] = newton((j / (M - 1)) * 2 - 1, (i / (M - 1)) * 2 - 1); mins.push({ u, v, t: tn(u, v) }); }
+    }
+    mins.sort((a, b) => a.t - b.t);
+    mins = mins.filter((m, k) => mins.findIndex((o) => Math.hypot(o.u - m.u, o.v - m.v) < 0.05) === k);
+    const A = mins[0], B = mins[1] || mins[0];
+    let best = null;                                                    // saddle: highest point on the straight A->B line, then Newton
+    for (let k = 1; k < 100; k++) { const u = A.u + (B.u - A.u) * k / 100, v = A.v + (B.v - A.v) * k / 100, t = tn(u, v); if (!best || t > best.t) best = { u, v, t }; }
+    let [su, sv] = newton(best.u, best.v);
+    const qs = local(su, sv);
+    if (!(qs.lmin < 0 && qs.lmax > 0 && qs.gn < 1e-3)) { su = best.u; sv = best.v; }
+    let G = null;                                                       // steepest interior slope
+    for (let i = 0; i < M; i += 2) for (let j = 0; j < M; j += 2) {
+      const u = (j / (M - 1)) * 2 - 1, v = (i / (M - 1)) * 2 - 1;
+      if (Math.abs(u) > 0.62 || Math.abs(v) > 0.62) continue;
+      const q = local(u, v); if (!G || q.gn > G.gn) G = { u, v, gn: q.gn };
+    }
+    function descent(u, v) {                                            // normalised gradient descent, step 0.025 in θ
+      const path = [[u, v]];
+      for (let k = 0; k < 220; k++) {
+        const q = local(u, v);
+        if (q.gn < 0.04) break;
+        u -= 0.025 * q.g[0] / q.gn; v -= 0.025 * q.g[1] / q.gn;
+        if (Math.abs(u) > 1 || Math.abs(v) > 1) break;
+        path.push([u, v]);
+      }
+      const end = [A, B].reduce((o, m) => (Math.hypot(m.u - u, m.v - v) < Math.hypot(o.u - u, o.v - v) ? m : o));
+      if (Math.hypot(end.u - u, end.v - v) < 0.12) path.push([end.u, end.v]);
+      return { path, to: end === A ? "A" : "B" };
+    }
+    const fx = (x, d) => (x >= 0 ? "+" : "\u2212") + Math.abs(x).toFixed(d);
+    const tS = tn(su, sv);
+    const mk = (key, title, col, u, v, extra, paths) => {
+      const q = local(u, v);
+      return { key, title, col, u, v, q, p3: surf(u, v), paths: paths || [],
+        lines: ["\u03b8 = (" + fx(u, 2) + ", " + fx(v, 2) + ")", "L = " + Math.max(0, q.t).toFixed(3), "|\u2207L| = " + q.gn.toFixed(3),
+                "\u03bb = " + fx(q.lmax, 2) + ", " + fx(q.lmin, 2)].concat(extra(q)) };
+    };
+    const qS = local(su, sv), dS1 = descent(su + 0.04 * qS.vmin[0], sv + 0.04 * qS.vmin[1]), dS2 = descent(su - 0.04 * qS.vmin[0], sv - 0.04 * qS.vmin[1]);
+    const dG = descent(G.u, G.v);
+    return [
+      mk("A", "GLOBAL MINIMUM \u00b7 basin A", P.cyan, A.u, A.v, (q) => ["sharpness \u03bbmax = " + q.lmax.toFixed(2), "\u03ba = \u03bbmax/\u03bbmin = " + (q.lmax / q.lmin).toFixed(2), "barrier \u2192 B = " + (tS - A.t).toFixed(3)]),
+      mk("S", "SADDLE \u00b7 ridge between A and B", P.orange, su, sv, () => ["index 1: one descent direction", "flows \u2192 " + dS1.to + " and " + dS2.to], [dS1.path, dS2.path]),
+      mk("B", "LOCAL MINIMUM \u00b7 basin B", "#7ad7ff", B.u, B.v, (q) => ["sharpness \u03bbmax = " + q.lmax.toFixed(2), "\u03ba = \u03bbmax/\u03bbmin = " + (q.lmax / q.lmin).toFixed(2), "barrier \u2192 A = " + (tS - B.t).toFixed(3)]),
+      mk("G", "STEEP SLOPE", "#ffd070", G.u, G.v, () => ["descent \u2192 basin " + dG.to + " in " + (dG.path.length - 1) + " steps"], [dG.path]),
+    ];
+  })();
+  const TOUR = { wide: 3.5, poi: 4.6, back: 2.6 };
+
   // ------------------------------------------------------------------ state
-  const S = { el: 0, yaw: 0.3, pitch: -0.42, particles: [], flashes: [], smoke: [], edges: [], edgeSet: new Set(), filled: [],
+  const S = { el: 0, yaw: 0.3, cam: { tx: 0, ty: 0, tz: 0, zm: 1, pitch: -0.42, ox: 0, oy: 0 }, tour: { ph: "replay", t: 0, i: 0 }, visible: true, particles: [], flashes: [], smoke: [], edges: [], edgeSet: new Set(), filled: [],
               zoom: 1, zoomT: 1, cage: 1, docked: false, docking: false, scanT: -1, nextScan: 0 };
   function resetSim(el0) {
     S.el = el0 || 0; S.particles.length = 0; S.flashes.length = 0; S.smoke.length = 0; S.edges.length = 0; S.edgeSet.clear(); S.filled.length = 0;
@@ -129,11 +211,12 @@
     S.zoomT = S.docked ? Math.min(W / 350, H / 228) : Math.min(W / 420, H / 430);
   }
   function project(p) {
-    const cy = Math.cos(S.yaw), sy = Math.sin(S.yaw), cp = Math.cos(S.pitch), sp = Math.sin(S.pitch);
-    const x1 = p.x * cy - p.z * sy, z1 = p.x * sy + p.z * cy;
-    const y1 = p.y * cp - z1 * sp, z2 = p.y * sp + z1 * cp;
-    const f = (700 / (700 + z2 + 300)) * S.zoom;
-    return { x: W / 2 + x1 * f, y: H * (S.docked ? 0.57 : 0.5) + y1 * f, s: f, z: z2 };
+    const C = S.cam, X = p.x - C.tx, Y = p.y - C.ty, Z = p.z - C.tz;
+    const cy = Math.cos(S.yaw), sy = Math.sin(S.yaw), cp = Math.cos(C.pitch), sp = Math.sin(C.pitch);
+    const x1 = X * cy - Z * sy, z1 = X * sy + Z * cy;
+    const y1 = Y * cp - z1 * sp, z2 = Y * sp + z1 * cp;
+    const f = (700 / (700 + z2 + 300)) * S.zoom * C.zm;
+    return { x: W * (0.5 + C.ox) + x1 * f, y: H * ((S.docked ? 0.55 : 0.5) + C.oy) + y1 * f, s: f, z: z2 };
   }
   const clamp = (x) => Math.max(0, Math.min(1, x));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -231,9 +314,20 @@
 
   // ------------------------------------------------------------------ timeline
   function update(dt) {
-    S.yaw += dt * (S.docked ? 0.12 : 0.2);
+    const tr = S.tour, focus = S.docked && tr.ph === "poi" ? POI[tr.i] : null;
+    S.yaw += dt * (!S.docked ? 0.2 : focus ? 0.05 : 0.12);
     S.zoom = lerp(S.zoom, S.zoomT, 1 - Math.exp(-dt * (S.docked ? 2.5 : 8)));
-    S.cage = lerp(S.cage, S.docked ? 0.22 : 1, 1 - Math.exp(-dt * 2));
+    S.cage = lerp(S.cage, !S.docked ? 1 : S.el < T.retB ? 0.75 : focus ? 0.08 : 0.22, 1 - Math.exp(-dt * 2));
+    const shot = focus ? { tx: focus.p3.x, ty: focus.p3.y, tz: focus.p3.z, zm: 2.1, pitch: -0.62, ox: -0.17, oy: 0.04 } : { tx: 0, ty: 0, tz: 0, zm: 1, pitch: -0.42, ox: 0, oy: 0 };
+    const kc = 1 - Math.exp(-dt * 2.4);
+    for (const key in shot) S.cam[key] = lerp(S.cam[key], shot[key], kc);
+    if (S.docked && !reduce) {                                           // wide -> inspect A, S, B, G -> wide -> replay
+      tr.t += dt;
+      if (tr.ph === "replay") { if (S.el >= T.retB) { tr.ph = "wide"; tr.t = 0; } }
+      else if (tr.ph === "wide" && tr.t > TOUR.wide) { tr.ph = "poi"; tr.i = 0; tr.t = 0; }
+      else if (tr.ph === "poi" && tr.t > TOUR.poi) { tr.t = 0; if (++tr.i >= POI.length) tr.ph = "back"; }
+      else if (tr.ph === "back" && tr.t > TOUR.back) { tr.ph = "replay"; tr.t = 0; resetSim(0); }
+    }
     S.el = Math.min(T.retB + 1, S.el + dt);
     const el = S.el;
     const fR = clamp((el - T.splitB) / (T.rowsB - T.splitB));
@@ -305,6 +399,63 @@
       ctx.shadowBlur = 10; ctx.shadowColor = P.cyan; ctx.fillStyle = P.cyan;
       ctx.fillRect(cur.x, cur.y, cur.px * 4.2, cur.px * 7);
     }
+    ctx.restore();
+  }
+  function drawTag() {                   // small status line, bottom left of the screen
+    const fs = Math.max(8, Math.min(11, W / 60)), tr = S.tour;
+    const txt = tr.ph === "poi" ? "INSPECT " + (tr.i + 1) + "/" + POI.length + " \u00b7 " + POI[tr.i].title.split(" \u00b7 ")[0]
+      : tr.ph === "replay" ? (S.el < T.retB ? "ETCH \u00b7 replay" : "ETCH") : "WIDE \u00b7 orbit";
+    ctx.globalCompositeOperation = "source-over";
+    ctx.font = fs + 'px "Share Tech Mono", monospace'; ctx.textBaseline = "alphabetic";
+    ctx.globalAlpha = 0.85; ctx.fillStyle = tr.ph === "poi" ? P.orange : P.cyan;
+    ctx.fillText("\u25b8 LATHE.ETCH // " + txt, 10, H - 10);
+  }
+  function drawInspect(o, t) {
+    const a = clamp((t - 0.9) / 0.4) * clamp((TOUR.poi - t) / 0.35);
+    if (a <= 0) return;
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    // ring on the surface around the point, plus a pulse
+    const ring = (rad) => { ctx.beginPath(); for (let k = 0; k <= 48; k++) { const an = (k / 48) * Math.PI * 2, p = project(surf(o.u + rad * Math.cos(an), o.v + rad * Math.sin(an))); k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); } ctx.stroke(); };
+    ctx.strokeStyle = o.col; ctx.lineWidth = 1.4; ctx.globalAlpha = 0.9 * a; ring(0.13);
+    const ph = (t * 0.9) % 1; ctx.globalAlpha = 0.7 * a * (1 - ph); ring(0.03 + 0.2 * ph);
+    // descent path(s), drawn progressively
+    const prog = clamp((t - 1.2) / 1.8);
+    ctx.strokeStyle = "#ffd070"; ctx.fillStyle = "#ffd070"; ctx.lineWidth = 1.6; ctx.setLineDash([5, 4]);
+    for (const path of o.paths) {
+      const n = Math.max(2, Math.floor(path.length * prog));
+      ctx.globalAlpha = 0.95 * a; ctx.beginPath();
+      for (let k = 0; k < n; k++) { const p = project(surf(path[k][0], path[k][1])); k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }
+      ctx.stroke();
+      const e = project(surf(path[n - 1][0], path[n - 1][1]));
+      ctx.setLineDash([]); ctx.beginPath(); ctx.arc(e.x, e.y, 3, 0, Math.PI * 2); ctx.fill(); ctx.setLineDash([5, 4]);
+    }
+    ctx.setLineDash([]);
+    // reticle
+    const c = project(o.p3), R0 = 14;
+    ctx.globalAlpha = a; ctx.strokeStyle = o.col; ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (const [dx, dy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      ctx.moveTo(c.x + dx * R0, c.y + dy * (R0 - 6)); ctx.lineTo(c.x + dx * R0, c.y + dy * R0); ctx.lineTo(c.x + dx * (R0 - 6), c.y + dy * R0);
+    }
+    ctx.moveTo(c.x - 5, c.y); ctx.lineTo(c.x - 2, c.y); ctx.moveTo(c.x + 2, c.y); ctx.lineTo(c.x + 5, c.y);
+    ctx.moveTo(c.x, c.y - 5); ctx.lineTo(c.x, c.y - 2); ctx.moveTo(c.x, c.y + 2); ctx.lineTo(c.x, c.y + 5);
+    ctx.stroke();
+    // stats panel, top right, with a leader line to the reticle
+    const fs = Math.max(8, Math.min(12.5, W / 50)), lh = fs * 1.42, pw = fs * 20.5, pad = fs * 0.8;
+    const rows = o.lines.length, ph2 = pad * 2 + lh * (rows + 2.2), px = W - pw - 10, py = 10;
+    const shown = Math.floor(clamp((t - 1.0) / 1.2) * (rows + 2) + 0.999);            // lines type in
+    ctx.globalAlpha = a; ctx.strokeStyle = o.col; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(c.x + R0, c.y - R0); ctx.lineTo(px - 8, py + ph2 * 0.5); ctx.lineTo(px, py + ph2 * 0.5); ctx.stroke();
+    ctx.fillStyle = "rgba(2,10,14,.82)"; ctx.fillRect(px, py, pw, ph2);
+    ctx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph2 - 1);
+    ctx.fillStyle = o.col; ctx.fillRect(px, py, 3, ph2);
+    ctx.textBaseline = "top";
+    ctx.font = "bold " + fs + 'px "Share Tech Mono", monospace'; ctx.fillStyle = o.col;
+    if (shown > 0) ctx.fillText(o.title, px + pad, py + pad);
+    ctx.font = fs + 'px "Share Tech Mono", monospace'; ctx.fillStyle = "#cfe9ef";
+    for (let k = 0; k < rows && k < shown - 1; k++) ctx.fillText(o.lines[k], px + pad, py + pad + lh * (k + 1.2));
+    if (shown >= rows + 2) { ctx.fillStyle = "rgba(160,190,200,.6)"; ctx.font = fs * 0.85 + 'px "Share Tech Mono", monospace'; ctx.fillText("demo surface \u00b7 not ATLAS data", px + pad, py + pad + lh * (rows + 1.3)); }
     ctx.restore();
   }
   function glowDot(p, r, a) {
@@ -461,6 +612,8 @@
       ctx.lineWidth = p.size * 1.4 * pr.s; ctx.lineCap = "round";
       ctx.beginPath(); ctx.moveTo(pv.x, pv.y); ctx.lineTo(pr.x, pr.y); ctx.stroke();
     }
+    if (S.docked && S.tour.ph === "poi") drawInspect(POI[S.tour.i], S.tour.t);
+    if (S.docked) drawTag();
     // CRT laser scan
     if (S.scanT >= 0) {
       const y = -0.08 * H + S.scanT * 1.16 * H;
@@ -532,7 +685,7 @@
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
-    if (!document.hidden) {
+    if (!document.hidden && (S.visible || !S.docked)) {
       if (!S.docked && !S.docking && S.el >= T.dock) startDock(T.dockDur);
       acc += dt;
       const idle = S.docked && S.el >= T.retB + 0.6 && S.scanT < 0 && !S.particles.length && !S.smoke.length;
@@ -547,7 +700,7 @@
   }
   crt.addEventListener("click", () => {
     if (!S.docked) return skipAhead();
-    if (S.el >= T.retB) { resetSim(T.dot); S.nextScan = performance.now() / 1000 + (T.retB - T.dot) + 0.8; }  // re-etch in place
+    if (S.el >= T.retB) { resetSim(0); S.tour.ph = "replay"; S.tour.t = 0; }  // re-etch in place
   });
   window.addEventListener("keydown", () => skipAhead(), { once: true });
   window.addEventListener("resize", () => { fit(); if (reduce) render(); });
@@ -557,6 +710,7 @@
     update(0); S.particles.length = 0; S.flashes.length = 0; S.smoke.length = 0; render();
     return;
   }
+  if ("IntersectionObserver" in window) new IntersectionObserver((es) => { S.visible = es[0].isIntersecting; }, { threshold: 0.01 }).observe(slot);
   if (deepLink) { dockNow(); resetSim(T.dot); }
   else { document.documentElement.classList.add("etch-lock"); fit(); S.zoom = S.zoomT; }
   requestAnimationFrame(frame);
