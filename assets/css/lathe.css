@@ -364,7 +364,7 @@ footer img { height: 22px; vertical-align: middle; margin-right: 8px; }
 
 /* ---------------------------------------------------------------- LATHE.ETCH splash + docked CRT */
 html.etch-lock, html.etch-lock body { overflow: hidden; }
-.etch-slot { position: relative; flex: 0 0 auto; width: 112px; height: 64px; border-radius: 8px; }
+.etch-slot { position: relative; flex: 0 0 auto; width: 157px; height: 90px; border-radius: 8px; }
 .etch-veil { position: fixed; inset: 0; z-index: 998; background: #020507; transition: opacity 1.1s ease .15s; }
 .etch-veil.out { opacity: 0; pointer-events: none; }
 .etch-crt {
@@ -392,6 +392,7 @@ html.etch-lock, html.etch-lock body { overflow: hidden; }
     linear-gradient(160deg, rgba(255, 255, 255, .05) 0%, rgba(255, 255, 255, 0) 30%);
 }
 .etch-crt.docked .etch-glass { border-radius: 8px; box-shadow: inset 0 0 12px rgba(0, 0, 0, .85); }
+.etch-hud { opacity: 0; }
 .etch-hud, .etch-skip {
   position: absolute; font-family: var(--f-mono); letter-spacing: .18em; text-transform: uppercase;
   color: var(--cyan); pointer-events: none; transition: opacity .4s;
@@ -403,6 +404,6 @@ html.etch-lock, html.etch-lock body { overflow: hidden; }
 .etch-crt.docking .etch-hud, .etch-crt.docking .etch-skip,
 .etch-crt.docked .etch-hud, .etch-crt.docked .etch-skip { opacity: 0; }
 @keyframes etch-flicker { 0%, 100% { opacity: 1; } 41% { opacity: .93; } 42% { opacity: 1; } 77% { opacity: .96; } 78% { opacity: 1; } }
-@media (max-width: 860px) { .etch-slot { width: 84px; height: 48px; } }
-@media (max-width: 480px) { .etch-slot { width: 64px; height: 38px; } .top-in { gap: 12px; } }
+@media (max-width: 860px) { .etch-slot { width: 118px; height: 67px; } }
+@media (max-width: 480px) { .etch-slot { width: 90px; height: 51px; } .top-in { gap: 12px; } }
 @media (prefers-reduced-motion: reduce) { .etch-crt.docked { animation: none; } }
